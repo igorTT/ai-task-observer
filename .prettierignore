@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.codex
+openspec
+backend/generated
+backend/src/api/generated
+frontend/src/api/generated
+package-lock.json

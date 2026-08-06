@@ -1,0 +1,36 @@
+schema: spec-driven
+
+context: |
+  AI Task Observer is a local-first application that attributes OpenAI Codex Desktop
+  session usage to Linear issues using an issue identifier embedded in the session title.
+  The initial product supports Codex Desktop and Linear only; semantic matching, MCP,
+  other AI harnesses, release management, and generic observability are out of scope.
+
+  Frontend: React, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Router,
+  RTK Query for server state, Zustand for local UI state, and an OpenAPI-generated client.
+  Backend: Node.js, TypeScript, Express, tsoa, the official Linear SDK, Chokidar, Pino,
+  and DuckDB through @duckdb/node-api without an ORM. SQL migrations define the physical
+  schema; passive database models and repositories isolate persistence.
+
+  Bun is the test runner only. Tests live in root __tests__ trees that mirror src.
+  The backend is the sole writable owner of DuckDB. The production frontend is served
+  by the backend. Docker uses a read-only Codex sessions mount and a persistent DuckDB volume.
+
+rules:
+  proposal:
+    - Include explicit non-goals and dependencies on other planned changes.
+    - Keep each change independently reviewable and avoid pulling later capabilities into scope.
+  specs:
+    - Define observable, testable behavior and explicit failure scenarios.
+  design:
+    - Record important alternatives and explain why they were rejected.
+    - Preserve the frontend/backend OpenAPI boundary and single-writer DuckDB invariant.
+  tasks:
+    - Order tasks by dependency and include proportional automated verification.
+    - Keep generated files separate from authored files.
+
+operations:
+  apply:
+    guidance:
+      - Keep implementation within the accepted change scope.
+      - Run lint, type checking, and relevant tests before completing a change.

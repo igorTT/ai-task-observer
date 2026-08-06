@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
+.tmp/
+tmp/
+scratch/
+*.log
+
+# Generated API contracts are intentionally committed. Do not ignore:
+# backend/generated, backend/src/api/generated, frontend/src/api/generated

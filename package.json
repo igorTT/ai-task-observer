@@ -1,0 +1,40 @@
+{
+  "name": "ai-task-observer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "generate:api": "npm run generate -w backend && npm run generate -w frontend",
+    "verify:generated": "node scripts/verify-generated.mjs",
+    "verify:aliases": "node scripts/verify-import-aliases.mjs",
+    "smoke:backend": "node scripts/smoke-backend.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "build:backend": "npm run build -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "verify": "npm run verify:generated && npm run verify:aliases && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run smoke:backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "bun": "1.3.14",
+    "concurrently": "^10.0.4",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.8.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.65.0"
+  }
+}
