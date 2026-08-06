@@ -1,0 +1,16 @@
+{"timestamp":"2026-02-01T00:00:00.000Z","type":"session_meta","payload":{"id":"fixture-variants","title":"FIX-1: explore"}}
+{"type":"turn_context","payload":{"model":"synthetic-model"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[]}}
+{"type":"response_item","payload":{"type":"message","role":"system","content":[]}}
+{"type":"response_item","payload":{"type":"message","role":"developer","content":[]}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[]}}
+{"type":"response_item","payload":{"type":"function_call","name":"synthetic","arguments":"REDACTED"}}
+{"type":"response_item","payload":{"type":"function_call_output","output":"REDACTED"}}
+{"type":"event_msg","payload":{"type":"user_message","message":"REDACTED"}}
+{"type":"event_msg","payload":{"type":"approval_request","command":"REDACTED"}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1,"cached_input_tokens":2,"output_tokens":3}}}}
+{"type":"token_usage","payload":{"input_tokens":1,"cached_input_tokens":1,"output_tokens":1,"cumulative":false}}
+{"type":"token_usage","payload":{"input_tokens":5,"cached_input_tokens":2,"output_tokens":4,"cumulative":true}}
+{"type":"token_usage_v2","payload":{"input_tokens":8,"cached_input_tokens":3,"output_tokens":5}}
+{"type":"session_title","payload":{"title":"FIX-1: apply"}}
+{"timestamp":"2026-02-01T01:00:00.000Z","type":"event_msg","payload":{"type":"session_end"}}

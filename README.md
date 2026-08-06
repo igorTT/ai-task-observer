@@ -46,9 +46,24 @@ Each application owns an `@/*` alias for its own `src/*` tree. Use `@/` for cros
 authored imports and `./` only for same-directory modules. The backend build rewrites aliases
 before Node.js execution; `npm run verify:aliases` checks this boundary.
 
-Foundation configuration is read once by the backend from `HOST`, `PORT`, `DATABASE_PATH`,
-and `LOG_LEVEL`. Defaults match `.env.example`; Codex paths, Linear credentials, and future
-product configuration are not needed for installation, generation, tests, or builds.
+Configuration is read and validated once at startup. `CODEX_SESSION_ROOTS` accepts one or
+more comma-separated session directories and defaults to the current user's
+`~/.codex/sessions`. The roots may be read-only and do not require Linear credentials.
+
+On startup the backend recursively backfills every available root, then watches for new and
+changed `.jsonl` files. Duplicate notifications are debounced and complete appended records
+resume from an atomic byte checkpoint. A missing root does not fail process health: ingestion
+reports it unavailable and periodically rediscovers it if the mount or directory appears later.
+
+```bash
+curl http://127.0.0.1:3000/api/imports/status
+curl -X POST http://127.0.0.1:3000/api/imports/rescan
+curl 'http://127.0.0.1:3000/api/sessions?limit=50&offset=0'
+```
+
+Only stable session metadata, current titles, lifecycle timestamps, developer-turn counts,
+token totals, checkpoints, and sanitized diagnostics are persisted or returned. Prompt and
+response text, reasoning, tool arguments, and tool results are never copied into DuckDB.
 
 ## Problem
 
@@ -216,7 +231,7 @@ Only the required Codex session directory should be mounted. The complete Codex 
 
 ## Development status
 
-The project foundation is implemented. Product capabilities such as Codex ingestion, Linear
-attribution, usage calculation, dashboard screens, and deployment packaging remain planned.
+Codex session ingestion is implemented. Linear attribution, usage pricing, dashboard screens,
+and deployment packaging remain planned.
 
 See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/README.md) for application-specific commands and boundaries.

@@ -47,7 +47,7 @@ describe("migration runner", () => {
     const { database } = await temporaryDatabase();
     await applyMigrations(database, logger);
     const records = await new MigrationRepository(database.connection).findAll();
-    expect(records).toHaveLength(1);
+    expect(records).toHaveLength(2);
     expect(records[0]?.name).toBe("foundation");
     database.close();
   });
@@ -60,7 +60,7 @@ describe("migration runner", () => {
     const reopened = await AppDatabase.open(opened.path);
     await applyMigrations(reopened, logger);
     const records = await new MigrationRepository(reopened.connection).findAll();
-    expect(records).toHaveLength(1);
+    expect(records).toHaveLength(2);
     reopened.close();
   });
 
@@ -95,7 +95,7 @@ describe("migration runner", () => {
       "SELECT count(*) AS count FROM information_schema.tables WHERE table_name = 'should_rollback'",
     );
     expect(tables.getRowObjects()[0]?.count).toBe(0n);
-    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(1);
+    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(2);
     database.close();
   });
 });

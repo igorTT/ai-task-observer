@@ -22,6 +22,281 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"SessionResponse": {
+				"properties": {
+					"sessionId": {
+						"type": "string"
+					},
+					"currentTitle": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string"
+					},
+					"endedAt": {
+						"type": "string"
+					},
+					"developerTurns": {
+						"type": "string"
+					},
+					"inputTokens": {
+						"type": "string"
+					},
+					"cachedInputTokens": {
+						"type": "string"
+					},
+					"outputTokens": {
+						"type": "string"
+					},
+					"totalTokens": {
+						"type": "string"
+					},
+					"usageObserved": {
+						"type": "boolean"
+					},
+					"importState": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"sessionId",
+					"developerTurns",
+					"inputTokens",
+					"cachedInputTokens",
+					"outputTokens",
+					"totalTokens",
+					"usageObserved",
+					"importState"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SessionPageResponse": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/SessionResponse"
+						},
+						"type": "array"
+					},
+					"total": {
+						"type": "number",
+						"format": "double"
+					},
+					"limit": {
+						"type": "number",
+						"format": "double"
+					},
+					"offset": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"items",
+					"total",
+					"limit",
+					"offset"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ErrorResponse": {
+				"properties": {
+					"error": {
+						"properties": {
+							"message": {
+								"type": "string"
+							},
+							"code": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"message",
+							"code"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"error"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"RootStatusResponse": {
+				"properties": {
+					"root": {
+						"type": "string"
+					},
+					"available": {
+						"type": "boolean"
+					},
+					"reason": {
+						"type": "string"
+					},
+					"discoveredFiles": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"root",
+					"available",
+					"discoveredFiles"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ImportRunResponse": {
+				"properties": {
+					"runId": {
+						"type": "string"
+					},
+					"trigger": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string"
+					},
+					"completedAt": {
+						"type": "string"
+					},
+					"rootsDiscovered": {
+						"type": "number",
+						"format": "double"
+					},
+					"filesDiscovered": {
+						"type": "number",
+						"format": "double"
+					},
+					"filesImported": {
+						"type": "number",
+						"format": "double"
+					},
+					"sessionsImported": {
+						"type": "number",
+						"format": "double"
+					},
+					"warnings": {
+						"type": "number",
+						"format": "double"
+					},
+					"errors": {
+						"type": "number",
+						"format": "double"
+					},
+					"summary": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"runId",
+					"trigger",
+					"state",
+					"rootsDiscovered",
+					"filesDiscovered",
+					"filesImported",
+					"sessionsImported",
+					"warnings",
+					"errors"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CheckpointStatusResponse": {
+				"properties": {
+					"source": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"completeOffset": {
+						"type": "string"
+					},
+					"unknownRecords": {
+						"type": "number",
+						"format": "double"
+					},
+					"malformedRecords": {
+						"type": "number",
+						"format": "double"
+					},
+					"lastError": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"source",
+					"status",
+					"completeOffset",
+					"unknownRecords",
+					"malformedRecords"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ImportStatusResponse": {
+				"properties": {
+					"roots": {
+						"items": {
+							"$ref": "#/components/schemas/RootStatusResponse"
+						},
+						"type": "array"
+					},
+					"currentRun": {
+						"$ref": "#/components/schemas/ImportRunResponse"
+					},
+					"lastCompletedRun": {
+						"$ref": "#/components/schemas/ImportRunResponse"
+					},
+					"checkpoints": {
+						"items": {
+							"$ref": "#/components/schemas/CheckpointStatusResponse"
+						},
+						"type": "array"
+					},
+					"acceptingWork": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"roots",
+					"checkpoints",
+					"acceptingWork"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"RescanResponse": {
+				"properties": {
+					"runId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"queued",
+							"running"
+						]
+					},
+					"coalesced": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"runId",
+					"state",
+					"coalesced"
+				],
+				"type": "object",
+				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {}
@@ -49,6 +324,134 @@
 				},
 				"tags": [
 					"System"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/sessions": {
+			"get": {
+				"operationId": "List",
+				"responses": {
+					"200": {
+						"description": "Session page",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionPageResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Sessions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"default": 50,
+							"format": "double",
+							"type": "number"
+						}
+					},
+					{
+						"in": "query",
+						"name": "offset",
+						"required": false,
+						"schema": {
+							"default": 0,
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/api/sessions/{sessionId}": {
+			"get": {
+				"operationId": "Detail",
+				"responses": {
+					"200": {
+						"description": "Session detail",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Session not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Sessions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "sessionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/imports/status": {
+			"get": {
+				"operationId": "ImportStatus",
+				"responses": {
+					"200": {
+						"description": "Status",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportStatusResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Imports"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/imports/rescan": {
+			"post": {
+				"operationId": "Rescan",
+				"responses": {
+					"202": {
+						"description": "Accepted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RescanResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Imports"
 				],
 				"security": [],
 				"parameters": []

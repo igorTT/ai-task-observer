@@ -27,17 +27,41 @@ resolves only to `backend/src`. Same-directory `./` imports remain valid. Develo
 tsoa use this mapping directly; the production build runs `tsc-alias` so compiled output
 contains Node.js-resolvable relative paths.
 
-## Foundation configuration
+## Configuration
 
-| Variable        | Default                        | Meaning               |
-| --------------- | ------------------------------ | --------------------- |
-| `HOST`          | `127.0.0.1`                    | HTTP listener address |
-| `PORT`          | `3000`                         | HTTP listener port    |
-| `DATABASE_PATH` | `data/ai-task-observer.duckdb` | Writable DuckDB file  |
-| `LOG_LEVEL`     | `info`                         | Pino level            |
+| Variable                    | Default                        | Meaning                                 |
+| --------------------------- | ------------------------------ | --------------------------------------- |
+| `HOST`                      | `127.0.0.1`                    | HTTP listener address                   |
+| `PORT`                      | `3000`                         | HTTP listener port                      |
+| `DATABASE_PATH`             | `data/ai-task-observer.duckdb` | Writable DuckDB file                    |
+| `LOG_LEVEL`                 | `info`                         | Pino level                              |
+| `CODEX_SESSION_ROOTS`       | `~/.codex/sessions`            | Comma-separated read-only session roots |
+| `CODEX_READ_CHUNK_BYTES`    | `1048576`                      | Bounded source read size (1 KiB–16 MiB) |
+| `CODEX_WATCH_DEBOUNCE_MS`   | `1000`                         | Duplicate filesystem-event debounce     |
+| `CODEX_ROOT_REDISCOVERY_MS` | `60000`                        | Unavailable-root rediscovery interval   |
 
-Configuration is validated before a listener or database is opened. Codex paths and Linear
-credentials are deliberately not part of the foundation configuration.
+Configuration is validated before a listener or database is opened. Each root is evaluated
+independently: missing, unreadable, and non-directory roots appear in import status without
+making `/api/health` unhealthy. Check the path and read permissions when a root is unavailable;
+the backend backfills it automatically when it later becomes readable.
+
+## Session ingestion operations
+
+Startup performs recursive historical discovery before Chokidar continues incremental
+watching. Appends resume at the last committed complete-record byte offset. Incomplete trailing
+JSON is deferred until its terminating newline arrives. Truncation, replacement, and parser
+version changes trigger an atomic rebuild that preserves the last valid snapshot on failure.
+Available roots are not periodically crawled; recursive discovery runs again only for an
+explicit rescan, while the retry timer checks roots currently marked unavailable.
+
+- `GET /api/imports/status` reports roots, runs, checkpoints, and sanitized diagnostics.
+- `POST /api/imports/rescan` starts or coalesces an explicit backfill.
+- `GET /api/sessions?limit=50&offset=0` lists sessions deterministically.
+- `GET /api/sessions/{sessionId}` returns one normalized session or a documented 404.
+
+Persistence and APIs contain source-derived identity, titles, timestamps, turns, and token
+facts, but never transcript text, reasoning, tool arguments, tool results, or raw malformed
+records.
 
 ## Migrations
 
@@ -104,7 +128,7 @@ Express API
 
 The backend is the sole writable owner of the DuckDB file. Other processes must use the HTTP API instead of opening the database directly.
 
-The project will use the official DuckDB Node client rather than forcing DuckDB through an unsupported ORM dialect.
+The project uses the official DuckDB Node client rather than forcing DuckDB through an unsupported ORM dialect.
 
 Database access should be isolated behind repositories:
 

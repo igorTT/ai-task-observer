@@ -1,0 +1,13 @@
+{"timestamp":"2026-01-02T03:04:05.000Z","type":"session_meta","payload":{"id":"session-001","timestamp":"2026-01-02T03:04:05.000Z","title":"ENG-101: explore","cwd":"/synthetic/project","instructions":"SYNTHETIC_PRIVATE_PROMPT"}}
+{"timestamp":"2026-01-02T03:05:00.000Z","type":"turn_context","payload":{"model":"synthetic-model","developer_instructions":"SYNTHETIC_PRIVATE_DEVELOPER"}}
+{"timestamp":"2026-01-02T03:05:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"SYNTHETIC_PRIVATE_PROMPT"}}
+{"timestamp":"2026-01-02T03:05:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"SYNTHETIC_PRIVATE_PROMPT"}]}}
+{"timestamp":"2026-01-02T03:05:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"SYNTHETIC_PRIVATE_RESPONSE"}]}}
+{"timestamp":"2026-01-02T03:05:03.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"SYNTHETIC_PRIVATE_TOOL_ARGUMENT"}}
+{"timestamp":"2026-01-02T03:05:04.000Z","type":"response_item","payload":{"type":"function_call_output","output":"SYNTHETIC_PRIVATE_TOOL_RESULT"}}
+{"timestamp":"2026-01-02T03:06:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":30},"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":30}}}}
+{"timestamp":"2026-01-02T03:07:00.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":150,"cached_input_tokens":25,"output_tokens":40},"last_token_usage":{"input_tokens":50,"cached_input_tokens":5,"output_tokens":10}}}}
+{"timestamp":"2026-01-02T03:08:00.000Z","type":"session_title","payload":{"title":"ENG-101: apply"}}
+{"timestamp":"2026-01-02T03:09:00.000Z","type":"future_private_record","payload":{"content":"SYNTHETIC_PRIVATE_UNKNOWN"}}
+not-valid-json
+{"timestamp":"2026-01-02T03:10:00.000Z","type":"event_msg","payload":{"type":"session_end"}}

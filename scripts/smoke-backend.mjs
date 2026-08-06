@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -40,6 +40,28 @@ for (const file of await emittedJavaScript(backendDist)) {
 
 const port = await reservePort();
 const directory = await mkdtemp(join(tmpdir(), "ai-task-observer-smoke-"));
+const sessionsRoot = join(directory, "sessions");
+await mkdir(sessionsRoot);
+await writeFile(
+  join(sessionsRoot, "smoke.jsonl"),
+  [
+    JSON.stringify({
+      timestamp: "2026-01-01T00:00:00.000Z",
+      type: "session_meta",
+      payload: { id: "smoke-session", title: "SMOKE-1: apply" },
+    }),
+    JSON.stringify({ type: "event_msg", payload: { type: "user_message", message: "synthetic" } }),
+    JSON.stringify({
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: {
+          total_token_usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3 },
+        },
+      },
+    }),
+  ].join("\n") + "\n",
+);
 const output = [];
 const child = spawn(process.execPath, ["backend/dist/server.js"], {
   cwd: root,
@@ -48,6 +70,7 @@ const child = spawn(process.execPath, ["backend/dist/server.js"], {
     HOST: "127.0.0.1",
     PORT: String(port),
     DATABASE_PATH: join(directory, "smoke.duckdb"),
+    CODEX_SESSION_ROOTS: sessionsRoot,
     LOG_LEVEL: "info",
   },
   stdio: ["ignore", "pipe", "pipe"],
@@ -73,8 +96,18 @@ try {
   const body = await response.json();
   if (body.status !== "healthy")
     throw new Error(`Unexpected health response: ${JSON.stringify(body)}`);
+  const sessionsResponse = await fetch(`http://127.0.0.1:${port}/api/sessions`);
+  const sessions = await sessionsResponse.json();
+  if (
+    !sessionsResponse.ok ||
+    sessions.total !== 1 ||
+    sessions.items?.[0]?.sessionId !== "smoke-session" ||
+    sessions.items?.[0]?.totalTokens !== "15"
+  ) {
+    throw new Error(`Unexpected session backfill response: ${JSON.stringify(sessions)}`);
+  }
   process.stdout.write(
-    "Compiled Node.js backend resolved aliases and returned a healthy response.\n",
+    "Compiled Node.js backend resolved aliases, backfilled a fixture, and returned it through the API.\n",
   );
 } finally {
   if (child.exitCode === null) {

@@ -4,12 +4,15 @@ import type { Logger } from "pino";
 
 import { errorHandler, notFoundHandler } from "@/api/middleware/errors.js";
 import { createApiRouter } from "@/api/router.js";
+import { configureApiDependencies, type ApiDependencies } from "@/api/dependencies.js";
 
 export interface AppDependencies {
   readonly logger: Logger;
+  readonly api?: ApiDependencies;
 }
 
-export function createApp({ logger }: AppDependencies): Express {
+export function createApp({ logger, api }: AppDependencies): Express {
+  if (api) configureApiDependencies(api);
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json());

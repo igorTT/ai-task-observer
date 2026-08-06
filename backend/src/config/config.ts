@@ -1,6 +1,16 @@
 import { z } from "zod";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 
 const logLevels = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
+
+const positiveInteger = (name: string, minimum: number, maximum: number, fallback: number) =>
+  z.coerce
+    .number()
+    .int(`${name} must be an integer`)
+    .min(minimum, `${name} must be at least ${minimum}`)
+    .max(maximum, `${name} must be at most ${maximum}`)
+    .default(fallback);
 
 const environmentSchema = z.object({
   HOST: z.string().trim().min(1, "HOST must not be empty").default("127.0.0.1"),
@@ -15,6 +25,29 @@ const environmentSchema = z.object({
       error: "LOG_LEVEL must be one of fatal, error, warn, info, debug, trace, silent",
     })
     .default("info"),
+  CODEX_SESSION_ROOTS: z
+    .string()
+    .transform((value, context) => {
+      const roots = value
+        .split(",")
+        .map((root) => root.trim())
+        .filter(Boolean)
+        .map((root) => resolve(root));
+      if (roots.length === 0) {
+        context.addIssue({ code: "custom", message: "CODEX_SESSION_ROOTS must contain a path" });
+        return z.NEVER;
+      }
+      return [...new Set(roots)];
+    })
+    .default([resolve(homedir(), ".codex", "sessions")]),
+  CODEX_READ_CHUNK_BYTES: positiveInteger(
+    "CODEX_READ_CHUNK_BYTES",
+    1_024,
+    16 * 1_024 * 1_024,
+    1_024 * 1_024,
+  ),
+  CODEX_WATCH_DEBOUNCE_MS: positiveInteger("CODEX_WATCH_DEBOUNCE_MS", 10, 60_000, 1_000),
+  CODEX_ROOT_REDISCOVERY_MS: positiveInteger("CODEX_ROOT_REDISCOVERY_MS", 1_000, 3_600_000, 60_000),
 });
 
 export interface AppConfig {
@@ -22,6 +55,10 @@ export interface AppConfig {
   readonly port: number;
   readonly databasePath: string;
   readonly logLevel: (typeof logLevels)[number];
+  readonly codexSessionRoots: readonly string[];
+  readonly codexReadChunkBytes: number;
+  readonly codexWatchDebounceMs: number;
+  readonly codexRootRediscoveryMs: number;
 }
 
 export class ConfigurationError extends Error {
@@ -50,5 +87,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv): Readonly<AppConfig> 
     port: parsed.data.PORT,
     databasePath: parsed.data.DATABASE_PATH,
     logLevel: parsed.data.LOG_LEVEL,
+    codexSessionRoots: Object.freeze(parsed.data.CODEX_SESSION_ROOTS),
+    codexReadChunkBytes: parsed.data.CODEX_READ_CHUNK_BYTES,
+    codexWatchDebounceMs: parsed.data.CODEX_WATCH_DEBOUNCE_MS,
+    codexRootRediscoveryMs: parsed.data.CODEX_ROOT_REDISCOVERY_MS,
   });
 }
