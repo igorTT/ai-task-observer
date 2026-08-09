@@ -6,6 +6,7 @@ import {
   type CodexSessionRow,
 } from "@/database/models/codex-session.model.js";
 import type { SessionMetadataMutation, ImportState } from "@/modules/sessions/domain.js";
+import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
 
 export class CodexSessionRepository {
   public constructor(private readonly connection: DuckDBConnection) {}
@@ -26,6 +27,11 @@ export class CodexSessionRepository {
       version: parserVersion,
     };
     const existing = await this.findById(metadata.sessionId);
+    const attributionRepository = new LinearSessionAttributionRepository(this.connection);
+    const attribution = existing
+      ? await attributionRepository.findBySessionId(metadata.sessionId)
+      : undefined;
+    if (attribution) await attributionRepository.deleteBySessionId(metadata.sessionId);
     const statement = existing
       ? await this.connection.prepare(`
           UPDATE codex_sessions SET
@@ -48,6 +54,7 @@ export class CodexSessionRepository {
         `);
     statement.bind(parameters);
     await statement.run();
+    if (attribution) await attributionRepository.save(attribution);
   }
 
   public async setImportState(
@@ -100,5 +107,12 @@ export class CodexSessionRepository {
       "SELECT count(*) AS count FROM codex_sessions",
     );
     return Number((reader.getRowObjects() as Array<{ count: bigint }>)[0]?.count ?? 0n);
+  }
+
+  public async listAll(): Promise<CodexSessionRecord[]> {
+    const reader = await this.connection.runAndReadAll(
+      "SELECT * FROM codex_sessions ORDER BY session_id",
+    );
+    return (reader.getRowObjects() as unknown as CodexSessionRow[]).map(mapSessionRow);
   }
 }

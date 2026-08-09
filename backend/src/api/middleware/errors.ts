@@ -3,6 +3,9 @@ import { ValidateError } from "tsoa";
 
 interface HttpError extends Error {
   status?: number;
+  code?: string;
+  expose?: boolean;
+  failureCategory?: string;
 }
 
 export const notFoundHandler: RequestHandler = (request, response) => {
@@ -28,10 +31,14 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _request, resp
 
   const httpError = error as HttpError;
   const status = typeof httpError.status === "number" ? httpError.status : 500;
+  const expose = status < 500 || httpError.expose === true;
   response.status(status).json({
     error: {
-      code: status >= 500 ? "internal_error" : "request_error",
-      message: status >= 500 ? "An unexpected error occurred" : httpError.message,
+      code: expose ? (httpError.code ?? "request_error") : "internal_error",
+      message: expose ? httpError.message : "An unexpected error occurred",
+      ...(expose && httpError.failureCategory
+        ? { failureCategory: httpError.failureCategory }
+        : {}),
     },
   });
 };

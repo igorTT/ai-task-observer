@@ -8,6 +8,8 @@ import { SystemController } from './../controllers/system.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { SessionsController } from './../controllers/sessions.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { LinearController } from './../controllers/linear.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ImportsController } from './../controllers/imports.controller.js';
 import type { Request as ExRequest, Response as ExResponse, RequestHandler, Router } from 'express';
 
@@ -20,6 +22,47 @@ const models: TsoaRoute.Models = {
         "dataType": "refObject",
         "properties": {
             "status": {"dataType":"enum","enums":["healthy"],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "AttributionStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["unlinked"]},{"dataType":"enum","enums":["unconfigured"]},{"dataType":"enum","enums":["pending"]},{"dataType":"enum","enums":["linked"]},{"dataType":"enum","enums":["not_found"]},{"dataType":"enum","enums":["error"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinearIssueResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "identifier": {"dataType":"string","required":true},
+            "title": {"dataType":"string","required":true},
+            "url": {"dataType":"string","required":true},
+            "team": {"dataType":"nestedObjectLiteral","nestedProperties":{"name":{"dataType":"string","required":true},"key":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+            "state": {"dataType":"nestedObjectLiteral","nestedProperties":{"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"required":true},
+            "updatedAt": {"dataType":"string","required":true},
+            "synchronizedAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinearFailureCategory": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["authentication"]},{"dataType":"enum","enums":["rate_limit"]},{"dataType":"enum","enums":["network"]},{"dataType":"enum","enums":["timeout"]},{"dataType":"enum","enums":["upstream"]},{"dataType":"enum","enums":["identifier_mismatch"]},{"dataType":"enum","enums":["unknown"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SessionAttributionResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "status": {"ref":"AttributionStatus","required":true},
+            "candidateIdentifier": {"dataType":"string"},
+            "phase": {"dataType":"string"},
+            "issue": {"ref":"LinearIssueResponse"},
+            "relinkRequired": {"dataType":"boolean","required":true},
+            "lastAttemptAt": {"dataType":"string"},
+            "lastSuccessAt": {"dataType":"string"},
+            "synchronizationState": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["unlinked"]},{"dataType":"enum","enums":["unconfigured"]},{"dataType":"enum","enums":["pending"]},{"dataType":"enum","enums":["synchronized"]},{"dataType":"enum","enums":["not_found"]},{"dataType":"enum","enums":["error"]}],"required":true},
+            "failureCategory": {"ref":"LinearFailureCategory"},
         },
         "additionalProperties": false,
     },
@@ -38,6 +81,7 @@ const models: TsoaRoute.Models = {
             "totalTokens": {"dataType":"string","required":true},
             "usageObserved": {"dataType":"boolean","required":true},
             "importState": {"dataType":"string","required":true},
+            "attribution": {"ref":"SessionAttributionResponse","required":true},
         },
         "additionalProperties": false,
     },
@@ -57,6 +101,67 @@ const models: TsoaRoute.Models = {
         "dataType": "refObject",
         "properties": {
             "error": {"dataType":"nestedObjectLiteral","nestedProperties":{"message":{"dataType":"string","required":true},"code":{"dataType":"string","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SessionRelinkResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "attribution": {"ref":"SessionAttributionResponse","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SessionRelinkErrorResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "error": {"dataType":"nestedObjectLiteral","nestedProperties":{"failureCategory":{"ref":"LinearFailureCategory"},"message":{"dataType":"string","required":true},"code":{"dataType":"string","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "Record_AttributionStatus.number_": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"unlinked":{"dataType":"double","required":true},"unconfigured":{"dataType":"double","required":true},"pending":{"dataType":"double","required":true},"linked":{"dataType":"double","required":true},"not_found":{"dataType":"double","required":true},"error":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinearSyncRunResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "runId": {"dataType":"string","required":true},
+            "trigger": {"dataType":"string","required":true},
+            "state": {"dataType":"string","required":true},
+            "candidateCount": {"dataType":"double","required":true},
+            "linkedCount": {"dataType":"double","required":true},
+            "notFoundCount": {"dataType":"double","required":true},
+            "errorCount": {"dataType":"double","required":true},
+            "failureCategory": {"ref":"LinearFailureCategory"},
+            "startedAt": {"dataType":"string"},
+            "completedAt": {"dataType":"string"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinearStatusResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "configured": {"dataType":"boolean","required":true},
+            "state": {"dataType":"string","required":true},
+            "acceptingWork": {"dataType":"boolean","required":true},
+            "counts": {"ref":"Record_AttributionStatus.number_","required":true},
+            "currentRun": {"ref":"LinearSyncRunResponse"},
+            "lastCompletedRun": {"ref":"LinearSyncRunResponse"},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "LinearSyncResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "runId": {"dataType":"string","required":true},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["queued"]},{"dataType":"enum","enums":["running"]}],"required":true},
+            "coalesced": {"dataType":"boolean","required":true},
         },
         "additionalProperties": false,
     },
@@ -227,6 +332,94 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsSessionsController_relink: Record<string, TsoaRoute.ParameterSchema> = {
+                sessionId: {"in":"path","name":"sessionId","required":true,"dataType":"string"},
+        };
+        app.post('/api/sessions/:sessionId/relink',
+            ...(fetchMiddlewares<RequestHandler>(SessionsController)),
+            ...(fetchMiddlewares<RequestHandler>(SessionsController.prototype.relink)),
+
+            async function SessionsController_relink(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsSessionsController_relink, request, response });
+
+                const controller = new SessionsController();
+
+              await templateService.apiHandler({
+                methodName: 'relink',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsLinearController_status: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/linear/status',
+            ...(fetchMiddlewares<RequestHandler>(LinearController)),
+            ...(fetchMiddlewares<RequestHandler>(LinearController.prototype.status)),
+
+            async function LinearController_status(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsLinearController_status, request, response });
+
+                const controller = new LinearController();
+
+              await templateService.apiHandler({
+                methodName: 'status',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsLinearController_sync: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.post('/api/linear/sync',
+            ...(fetchMiddlewares<RequestHandler>(LinearController)),
+            ...(fetchMiddlewares<RequestHandler>(LinearController.prototype.sync)),
+
+            async function LinearController_sync(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsLinearController_sync, request, response });
+
+                const controller = new LinearController();
+
+              await templateService.apiHandler({
+                methodName: 'sync',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
               });
             } catch (err) {
                 return next(err);

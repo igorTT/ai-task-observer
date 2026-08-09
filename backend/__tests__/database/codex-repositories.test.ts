@@ -22,7 +22,7 @@ async function repository(): Promise<{
   directories.push(directory);
   const database = await AppDatabase.open(join(directory, "test.duckdb"));
   await applyMigrations(database, logger);
-  return { database, repository: new CodexIngestionRepository(database.connection) };
+  return { database, repository: new CodexIngestionRepository(database) };
 }
 
 afterEach(async () => {

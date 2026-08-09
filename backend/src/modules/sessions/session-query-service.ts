@@ -1,6 +1,9 @@
 import { jsonSafeCount } from "@/database/models/codex-session-usage.model.js";
 import type { CodexSessionRepository } from "@/database/repositories/codex-session-repository.js";
 import type { CodexSessionUsageRepository } from "@/database/repositories/codex-session-usage-repository.js";
+import type { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
+import type { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
+import type { SessionAttributionResponse } from "@/api/models/linear-response.js";
 
 export interface SessionView {
   readonly sessionId: string;
@@ -14,6 +17,7 @@ export interface SessionView {
   readonly totalTokens: string;
   readonly usageObserved: boolean;
   readonly importState: string;
+  readonly attribution: SessionAttributionResponse;
 }
 
 export interface SessionPage {
@@ -27,6 +31,8 @@ export class SessionQueryService {
   public constructor(
     private readonly sessions: CodexSessionRepository,
     private readonly usage: CodexSessionUsageRepository,
+    private readonly attributions?: LinearSessionAttributionRepository,
+    private readonly issues?: LinearIssueRepository,
   ) {}
 
   public async list(limit: number, offset: number): Promise<SessionPage> {
@@ -48,11 +54,14 @@ export class SessionQueryService {
   }
 
   async #view(sessionId: string): Promise<SessionView> {
-    const [session, usage] = await Promise.all([
+    const [session, usage, attribution] = await Promise.all([
       this.sessions.findById(sessionId),
       this.usage.findBySessionId(sessionId),
+      this.attributions?.findBySessionId(sessionId),
     ]);
     if (!session) throw new Error("Session disappeared during query");
+    const issue =
+      attribution?.linearId && this.issues ? await this.#issue(attribution.linearId) : undefined;
     return {
       sessionId: session.sessionId,
       ...(session.currentTitle ? { currentTitle: session.currentTitle } : {}),
@@ -65,6 +74,47 @@ export class SessionQueryService {
       totalTokens: jsonSafeCount(usage?.totalTokens ?? 0n),
       usageObserved: usage?.usageObserved ?? false,
       importState: session.importState,
+      attribution: attribution
+        ? {
+            status: attribution.status,
+            ...(attribution.candidateIdentifier
+              ? { candidateIdentifier: attribution.candidateIdentifier }
+              : {}),
+            ...(attribution.phase ? { phase: attribution.phase } : {}),
+            ...(issue ? { issue } : {}),
+            relinkRequired:
+              attribution.status === "linked" &&
+              attribution.candidateIdentifier !== undefined &&
+              issue !== undefined &&
+              attribution.candidateIdentifier !== issue.identifier,
+            ...(attribution.lastAttemptAt
+              ? { lastAttemptAt: attribution.lastAttemptAt.toISOString() }
+              : {}),
+            ...(attribution.lastSuccessAt
+              ? { lastSuccessAt: attribution.lastSuccessAt.toISOString() }
+              : {}),
+            synchronizationState:
+              attribution.status === "linked" ? "synchronized" : attribution.status,
+            ...(attribution.failureCategory
+              ? { failureCategory: attribution.failureCategory }
+              : {}),
+          }
+        : { status: "unlinked", relinkRequired: false, synchronizationState: "unlinked" },
+    };
+  }
+
+  async #issue(linearId: string): Promise<NonNullable<SessionAttributionResponse["issue"]>> {
+    const issue = await this.issues!.findById(linearId);
+    if (!issue) throw new Error("Attributed Linear issue disappeared during query");
+    return {
+      id: issue.linearId,
+      identifier: issue.identifier,
+      title: issue.title,
+      url: issue.url,
+      team: issue.team,
+      state: issue.state,
+      updatedAt: issue.updatedAt.toISOString(),
+      synchronizedAt: issue.syncedAt.toISOString(),
     };
   }
 }

@@ -9,6 +9,12 @@ import { loadConfig, type AppConfig } from "@/config/config.js";
 import { AppDatabase } from "@/database/database.js";
 import { applyMigrations } from "@/database/migrate.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
+import { CodexSessionRepository } from "@/database/repositories/codex-session-repository.js";
+import { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
+import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
+import { LinearSyncRunRepository } from "@/database/repositories/linear-sync-run-repository.js";
+import { AttributionCoordinator } from "@/modules/linear/coordinator.js";
+import { LinearSdkIssueReader } from "@/modules/linear/linear-sdk-reader.js";
 import { IngestionCoordinator } from "@/modules/sessions/coordinator.js";
 import { CodexSourceImporter } from "@/modules/sessions/importer.js";
 import { SessionQueryService } from "@/modules/sessions/session-query-service.js";
@@ -18,7 +24,17 @@ export interface RunningServer {
   readonly httpServer: Server;
   readonly database: AppDatabase;
   readonly ingestion: IngestionLifecycle;
+  readonly attribution: AttributionLifecycle;
   readonly close: () => Promise<void>;
+}
+
+export interface AttributionLifecycle {
+  readonly start: () => Promise<void>;
+  readonly close: () => Promise<void>;
+  readonly status: AttributionCoordinator["status"];
+  readonly sync: AttributionCoordinator["sync"];
+  readonly relink: AttributionCoordinator["relink"];
+  readonly notifySessions: AttributionCoordinator["notifySessions"];
 }
 
 export interface IngestionLifecycle {
@@ -36,7 +52,13 @@ export interface ServerFactories {
     config: Readonly<AppConfig>,
     database: AppDatabase,
     logger: Logger,
+    onSessionsCommitted?: (sessionIds: readonly string[]) => void | Promise<void>,
   ) => IngestionLifecycle;
+  readonly createAttribution?: (
+    config: Readonly<AppConfig>,
+    database: AppDatabase,
+    logger: Logger,
+  ) => AttributionLifecycle;
 }
 
 export async function startServer(
@@ -47,15 +69,28 @@ export async function startServer(
   const logger = createLogger(config);
   const database = await (factories.openDatabase ?? AppDatabase.open)(config.databasePath);
   let ingestion: IngestionLifecycle | undefined;
+  let attribution: AttributionLifecycle | undefined;
 
   try {
     await (factories.migrate ?? applyMigrations)(database, logger);
-    ingestion = (factories.createIngestion ?? createIngestion)(config, database, logger);
+    attribution = (factories.createAttribution ?? createAttribution)(config, database, logger);
+    const activeAttribution = attribution;
+    ingestion = (factories.createIngestion ?? createIngestion)(
+      config,
+      database,
+      logger,
+      (sessionIds) => activeAttribution.notifySessions(sessionIds),
+    );
     await ingestion.start();
     const activeIngestion = ingestion;
+    await activeAttribution.start();
     const app = createApp({
       logger,
-      api: { ingestion: activeIngestion, sessions: activeIngestion.sessions },
+      api: {
+        ingestion: activeIngestion,
+        sessions: activeIngestion.sessions,
+        linear: activeAttribution,
+      },
     });
     const httpServer = app.listen(config.port, config.host);
     await once(httpServer, "listening");
@@ -66,16 +101,22 @@ export async function startServer(
       closing ??= (async () => {
         httpServer.close();
         await once(httpServer, "close");
-        await activeIngestion.close();
+        await Promise.all([activeIngestion.close(), activeAttribution.close()]);
         database.close();
         logger.info("backend stopped");
       })();
       return closing;
     };
 
-    return { httpServer, database, ingestion: activeIngestion, close };
+    return {
+      httpServer,
+      database,
+      ingestion: activeIngestion,
+      attribution: activeAttribution,
+      close,
+    };
   } catch (error) {
-    await ingestion?.close();
+    await Promise.all([ingestion?.close(), attribution?.close()]);
     database.close();
     throw error;
   }
@@ -85,8 +126,9 @@ function createIngestion(
   config: Readonly<AppConfig>,
   database: AppDatabase,
   logger: Logger,
+  onSessionsCommitted?: (sessionIds: readonly string[]) => void | Promise<void>,
 ): IngestionLifecycle {
-  const repository = new CodexIngestionRepository(database.connection);
+  const repository = new CodexIngestionRepository(database);
   const importer = new CodexSourceImporter({
     repository,
     readChunkBytes: config.codexReadChunkBytes,
@@ -99,9 +141,30 @@ function createIngestion(
     logger,
     debounceMs: config.codexWatchDebounceMs,
     rediscoveryMs: config.codexRootRediscoveryMs,
+    ...(onSessionsCommitted ? { onSessionsCommitted } : {}),
   });
+  const attributions = new LinearSessionAttributionRepository(database.connection);
+  const issues = new LinearIssueRepository(database.connection);
   return Object.assign(coordinator, {
-    sessions: new SessionQueryService(repository.sessions, repository.usage),
+    sessions: new SessionQueryService(repository.sessions, repository.usage, attributions, issues),
+  });
+}
+
+function createAttribution(
+  config: Readonly<AppConfig>,
+  database: AppDatabase,
+  logger: Logger,
+): AttributionLifecycle {
+  return new AttributionCoordinator({
+    database,
+    sessions: new CodexSessionRepository(database.connection),
+    attributions: new LinearSessionAttributionRepository(database.connection),
+    issues: new LinearIssueRepository(database.connection),
+    runs: new LinearSyncRunRepository(database.connection),
+    ...(config.linearApiKey ? { reader: new LinearSdkIssueReader(config.linearApiKey) } : {}),
+    logger,
+    cacheTtlMs: config.linearCacheTtlMs,
+    maxConcurrency: config.linearMaxConcurrency,
   });
 }
 

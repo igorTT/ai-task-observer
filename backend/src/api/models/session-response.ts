@@ -1,3 +1,5 @@
+import type { SessionAttributionResponse } from "@/api/models/linear-response.js";
+
 export interface SessionResponse {
   readonly sessionId: string;
   readonly currentTitle?: string;
@@ -10,6 +12,7 @@ export interface SessionResponse {
   readonly totalTokens: string;
   readonly usageObserved: boolean;
   readonly importState: string;
+  readonly attribution: SessionAttributionResponse;
 }
 
 export interface SessionPageResponse {

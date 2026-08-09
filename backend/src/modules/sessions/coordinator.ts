@@ -43,6 +43,7 @@ export interface IngestionCoordinatorOptions {
   readonly rediscoveryMs: number;
   readonly watchUsePolling?: boolean;
   readonly discover?: (root: string) => Promise<RootDiscoveryStatus>;
+  readonly onSessionsCommitted?: (sessionIds: readonly string[]) => void | Promise<void>;
 }
 
 export class IngestionCoordinator {
@@ -54,6 +55,7 @@ export class IngestionCoordinator {
   readonly #rediscoveryMs: number;
   readonly #watchUsePolling: boolean;
   readonly #discover: (root: string) => Promise<RootDiscoveryStatus>;
+  readonly #onSessionsCommitted: (sessionIds: readonly string[]) => void | Promise<void>;
   readonly #rootStatus = new Map<string, RootDiscoveryStatus>();
   readonly #watchers = new Map<string, FSWatcher>();
   readonly #debounceTimers = new Map<string, NodeJS.Timeout>();
@@ -73,6 +75,7 @@ export class IngestionCoordinator {
     this.#rediscoveryMs = options.rediscoveryMs;
     this.#watchUsePolling = options.watchUsePolling ?? false;
     this.#discover = options.discover ?? discoverRoot;
+    this.#onSessionsCommitted = options.onSessionsCommitted ?? (() => undefined);
   }
 
   public async start(): Promise<void> {
@@ -263,7 +266,8 @@ export class IngestionCoordinator {
         const [path, work] = next;
         this.#pending.delete(path);
         try {
-          await this.#importer.importSource(work.root, path, work.runId);
+          const imported = await this.#importer.importSource(work.root, path, work.runId);
+          if (imported.sessions.length > 0) await this.#onSessionsCommitted(imported.sessions);
         } catch (error) {
           this.#logger.error(
             { error: errorName(error), source: basename(path) },

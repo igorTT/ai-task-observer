@@ -22,6 +22,8 @@ describe("loadConfig", () => {
       codexReadChunkBytes: 1_024 * 1_024,
       codexWatchDebounceMs: 1_000,
       codexRootRediscoveryMs: 60_000,
+      linearCacheTtlMs: 60 * 60 * 1_000,
+      linearMaxConcurrency: 4,
     });
   });
 
@@ -51,5 +53,21 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ CODEX_SESSION_ROOTS: " , ", CODEX_READ_CHUNK_BYTES: "10" })).toThrow(
       /CODEX_SESSION_ROOTS.*CODEX_READ_CHUNK_BYTES/u,
     );
+  });
+
+  test("accepts optional Linear configuration and treats an empty key as unconfigured", () => {
+    expect(loadConfig({ LINEAR_API_KEY: "" }).linearApiKey).toBeUndefined();
+    expect(
+      loadConfig({
+        LINEAR_API_KEY: " lin_api_example_key ",
+        LINEAR_CACHE_TTL_MS: "5000",
+        LINEAR_MAX_CONCURRENCY: "2",
+      }),
+    ).toMatchObject({
+      linearApiKey: "lin_api_example_key",
+      linearCacheTtlMs: 5000,
+      linearMaxConcurrency: 2,
+    });
+    expect(() => loadConfig({ LINEAR_API_KEY: "short" })).toThrow(/LINEAR_API_KEY/u);
   });
 });

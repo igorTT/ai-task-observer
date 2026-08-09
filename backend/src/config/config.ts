@@ -48,6 +48,17 @@ const environmentSchema = z.object({
   ),
   CODEX_WATCH_DEBOUNCE_MS: positiveInteger("CODEX_WATCH_DEBOUNCE_MS", 10, 60_000, 1_000),
   CODEX_ROOT_REDISCOVERY_MS: positiveInteger("CODEX_ROOT_REDISCOVERY_MS", 1_000, 3_600_000, 60_000),
+  LINEAR_API_KEY: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().min(10, "LINEAR_API_KEY must be at least 10 characters").optional(),
+  ),
+  LINEAR_CACHE_TTL_MS: positiveInteger(
+    "LINEAR_CACHE_TTL_MS",
+    1_000,
+    30 * 24 * 60 * 60 * 1_000,
+    60 * 60 * 1_000,
+  ),
+  LINEAR_MAX_CONCURRENCY: positiveInteger("LINEAR_MAX_CONCURRENCY", 1, 20, 4),
 });
 
 export interface AppConfig {
@@ -59,6 +70,9 @@ export interface AppConfig {
   readonly codexReadChunkBytes: number;
   readonly codexWatchDebounceMs: number;
   readonly codexRootRediscoveryMs: number;
+  readonly linearApiKey?: string;
+  readonly linearCacheTtlMs: number;
+  readonly linearMaxConcurrency: number;
 }
 
 export class ConfigurationError extends Error {
@@ -91,5 +105,8 @@ export function loadConfig(environment: NodeJS.ProcessEnv): Readonly<AppConfig> 
     codexReadChunkBytes: parsed.data.CODEX_READ_CHUNK_BYTES,
     codexWatchDebounceMs: parsed.data.CODEX_WATCH_DEBOUNCE_MS,
     codexRootRediscoveryMs: parsed.data.CODEX_ROOT_REDISCOVERY_MS,
+    ...(parsed.data.LINEAR_API_KEY ? { linearApiKey: parsed.data.LINEAR_API_KEY } : {}),
+    linearCacheTtlMs: parsed.data.LINEAR_CACHE_TTL_MS,
+    linearMaxConcurrency: parsed.data.LINEAR_MAX_CONCURRENCY,
   });
 }

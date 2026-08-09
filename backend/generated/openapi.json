@@ -23,6 +23,143 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"AttributionStatus": {
+				"type": "string",
+				"enum": [
+					"unlinked",
+					"unconfigured",
+					"pending",
+					"linked",
+					"not_found",
+					"error"
+				]
+			},
+			"LinearIssueResponse": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"identifier": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"team": {
+						"properties": {
+							"name": {
+								"type": "string"
+							},
+							"key": {
+								"type": "string"
+							},
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"name",
+							"key",
+							"id"
+						],
+						"type": "object"
+					},
+					"state": {
+						"properties": {
+							"name": {
+								"type": "string"
+							},
+							"id": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"name",
+							"id"
+						],
+						"type": "object"
+					},
+					"updatedAt": {
+						"type": "string"
+					},
+					"synchronizedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"identifier",
+					"title",
+					"url",
+					"team",
+					"state",
+					"updatedAt",
+					"synchronizedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"LinearFailureCategory": {
+				"type": "string",
+				"enum": [
+					"authentication",
+					"rate_limit",
+					"network",
+					"timeout",
+					"upstream",
+					"identifier_mismatch",
+					"unknown"
+				]
+			},
+			"SessionAttributionResponse": {
+				"properties": {
+					"status": {
+						"$ref": "#/components/schemas/AttributionStatus"
+					},
+					"candidateIdentifier": {
+						"type": "string"
+					},
+					"phase": {
+						"type": "string"
+					},
+					"issue": {
+						"$ref": "#/components/schemas/LinearIssueResponse"
+					},
+					"relinkRequired": {
+						"type": "boolean"
+					},
+					"lastAttemptAt": {
+						"type": "string"
+					},
+					"lastSuccessAt": {
+						"type": "string"
+					},
+					"synchronizationState": {
+						"type": "string",
+						"enum": [
+							"unlinked",
+							"unconfigured",
+							"pending",
+							"synchronized",
+							"not_found",
+							"error"
+						]
+					},
+					"failureCategory": {
+						"$ref": "#/components/schemas/LinearFailureCategory"
+					}
+				},
+				"required": [
+					"status",
+					"relinkRequired",
+					"synchronizationState"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"SessionResponse": {
 				"properties": {
 					"sessionId": {
@@ -57,6 +194,9 @@
 					},
 					"importState": {
 						"type": "string"
+					},
+					"attribution": {
+						"$ref": "#/components/schemas/SessionAttributionResponse"
 					}
 				},
 				"required": [
@@ -67,7 +207,8 @@
 					"outputTokens",
 					"totalTokens",
 					"usageObserved",
-					"importState"
+					"importState",
+					"attribution"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -122,6 +263,186 @@
 				},
 				"required": [
 					"error"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SessionRelinkResponse": {
+				"properties": {
+					"attribution": {
+						"$ref": "#/components/schemas/SessionAttributionResponse"
+					}
+				},
+				"required": [
+					"attribution"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SessionRelinkErrorResponse": {
+				"properties": {
+					"error": {
+						"properties": {
+							"failureCategory": {
+								"$ref": "#/components/schemas/LinearFailureCategory"
+							},
+							"message": {
+								"type": "string"
+							},
+							"code": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"message",
+							"code"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"error"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"Record_AttributionStatus.number_": {
+				"properties": {
+					"unlinked": {
+						"type": "number",
+						"format": "double"
+					},
+					"unconfigured": {
+						"type": "number",
+						"format": "double"
+					},
+					"pending": {
+						"type": "number",
+						"format": "double"
+					},
+					"linked": {
+						"type": "number",
+						"format": "double"
+					},
+					"not_found": {
+						"type": "number",
+						"format": "double"
+					},
+					"error": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"unlinked",
+					"unconfigured",
+					"pending",
+					"linked",
+					"not_found",
+					"error"
+				],
+				"type": "object",
+				"description": "Construct a type with a set of properties K of type T"
+			},
+			"LinearSyncRunResponse": {
+				"properties": {
+					"runId": {
+						"type": "string"
+					},
+					"trigger": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string"
+					},
+					"candidateCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"linkedCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"notFoundCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"errorCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"failureCategory": {
+						"$ref": "#/components/schemas/LinearFailureCategory"
+					},
+					"startedAt": {
+						"type": "string"
+					},
+					"completedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"runId",
+					"trigger",
+					"state",
+					"candidateCount",
+					"linkedCount",
+					"notFoundCount",
+					"errorCount"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"LinearStatusResponse": {
+				"properties": {
+					"configured": {
+						"type": "boolean"
+					},
+					"state": {
+						"type": "string"
+					},
+					"acceptingWork": {
+						"type": "boolean"
+					},
+					"counts": {
+						"$ref": "#/components/schemas/Record_AttributionStatus.number_"
+					},
+					"currentRun": {
+						"$ref": "#/components/schemas/LinearSyncRunResponse"
+					},
+					"lastCompletedRun": {
+						"$ref": "#/components/schemas/LinearSyncRunResponse"
+					}
+				},
+				"required": [
+					"configured",
+					"state",
+					"acceptingWork",
+					"counts"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"LinearSyncResponse": {
+				"properties": {
+					"runId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"queued",
+							"running"
+						]
+					},
+					"coalesced": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"runId",
+					"state",
+					"coalesced"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -411,6 +732,141 @@
 						}
 					}
 				]
+			}
+		},
+		"/api/sessions/{sessionId}/relink": {
+			"post": {
+				"operationId": "Relink",
+				"responses": {
+					"200": {
+						"description": "Session attribution relinked",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Session or Linear issue not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkErrorResponse"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Linear unconfigured or session title changed",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkErrorResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Current title has no Linear issue candidate",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkErrorResponse"
+								}
+							}
+						}
+					},
+					"502": {
+						"description": "Linear rejected the relink lookup",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkErrorResponse"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "Linear relink lookup temporarily unavailable",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionRelinkErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Sessions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "sessionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/api/linear/status": {
+			"get": {
+				"operationId": "Status",
+				"responses": {
+					"200": {
+						"description": "Linear integration status",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LinearStatusResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Linear"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/linear/sync": {
+			"post": {
+				"operationId": "Sync",
+				"responses": {
+					"202": {
+						"description": "Synchronization accepted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LinearSyncResponse"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Linear is not configured",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Linear"
+				],
+				"security": [],
+				"parameters": []
 			}
 		},
 		"/api/imports/status": {

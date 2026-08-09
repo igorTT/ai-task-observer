@@ -50,6 +50,10 @@ Configuration is read and validated once at startup. `CODEX_SESSION_ROOTS` accep
 more comma-separated session directories and defaults to the current user's
 `~/.codex/sessions`. The roots may be read-only and do not require Linear credentials.
 
+`LINEAR_API_KEY` is optional. Without it, backend health and Codex ingestion remain available,
+candidate titles report an unconfigured attribution state, and no Linear request is made. When
+configured, the integration uses the official Linear SDK only for exact, read-only issue lookup.
+
 On startup the backend recursively backfills every available root, then watches for new and
 changed `.jsonl` files. Duplicate notifications are debounced and complete appended records
 resume from an atomic byte checkpoint. A missing root does not fail process health: ingestion
@@ -59,6 +63,9 @@ reports it unavailable and periodically rediscovers it if the mount or directory
 curl http://127.0.0.1:3000/api/imports/status
 curl -X POST http://127.0.0.1:3000/api/imports/rescan
 curl 'http://127.0.0.1:3000/api/sessions?limit=50&offset=0'
+curl http://127.0.0.1:3000/api/linear/status
+curl -X POST http://127.0.0.1:3000/api/linear/sync
+curl -X POST http://127.0.0.1:3000/api/sessions/<session-id>/relink
 ```
 
 Only stable session metadata, current titles, lifecycle timestamps, developer-turn counts,
@@ -86,15 +93,32 @@ ENG-215: apply
 ENG-215: verify
 ```
 
-The issue identifier is the authoritative link. The text after the colon is optional metadata that can be used to break usage down by workflow phase.
+For an unlinked session, the issue identifier is eligible to establish the initial link. After
+that link succeeds, the stored issue remains authoritative until the user explicitly relinks
+the session. The text after the colon is optional metadata that can be used to break usage down
+by workflow phase.
 
-The currently recognized phases are:
+Common phase examples are:
 
 - `explore` — exploration and proposal preparation
 - `apply` — implementation
 - `verify` — code review, styling changes, and artifact preparation
 
 Several sessions can belong to the same issue and phase. Sessions whose titles do not contain a valid Linear identifier remain visible as unlinked sessions.
+
+The phase is optional free-form metadata; it is not restricted to those examples. The identifier
+must be at the start of the trimmed title and any suffix must use a colon, so `ENG-215 apply` and
+`work on ENG-215` remain unlinked. Renaming an unlinked session can establish its first link.
+Renaming a linked session to another identifier records a candidate for review but does not move
+or clear the stored link. Apply that candidate explicitly with
+`POST /api/sessions/{sessionId}/relink`; failed or stale relink attempts preserve the previous
+link and all imported usage facts.
+
+Linear issue summaries are cached for one hour by default (`LINEAR_CACHE_TTL_MS`) and refreshed
+through startup or manual synchronization. Linked issues are refreshed by their stored identity,
+not by a later title candidate. The cache contains only minimal display metadata.
+Credentials, descriptions, comments, attachments, raw responses, and Codex transcript content
+are never persisted or exposed. The integration does not mutate Linear.
 
 ## Core workflow
 
@@ -231,7 +255,7 @@ Only the required Codex session directory should be mounted. The complete Codex 
 
 ## Development status
 
-Codex session ingestion is implemented. Linear attribution, usage pricing, dashboard screens,
-and deployment packaging remain planned.
+Codex session ingestion and Linear session attribution are implemented. Usage pricing, dashboard
+screens, and deployment packaging remain planned.
 
 See [frontend/README.md](frontend/README.md) and [backend/README.md](backend/README.md) for application-specific commands and boundaries.

@@ -39,11 +39,19 @@ contains Node.js-resolvable relative paths.
 | `CODEX_READ_CHUNK_BYTES`    | `1048576`                      | Bounded source read size (1 KiB–16 MiB) |
 | `CODEX_WATCH_DEBOUNCE_MS`   | `1000`                         | Duplicate filesystem-event debounce     |
 | `CODEX_ROOT_REDISCOVERY_MS` | `60000`                        | Unavailable-root rediscovery interval   |
+| `LINEAR_API_KEY`            | unset                          | Optional Linear personal API key        |
+| `LINEAR_CACHE_TTL_MS`       | `3600000`                      | Linear issue-cache freshness window     |
+| `LINEAR_MAX_CONCURRENCY`    | `4`                            | Maximum concurrent Linear issue reads   |
 
 Configuration is validated before a listener or database is opened. Each root is evaluated
 independently: missing, unreadable, and non-directory roots appear in import status without
 making `/api/health` unhealthy. Check the path and read permissions when a root is unavailable;
 the backend backfills it automatically when it later becomes readable.
+
+Leaving `LINEAR_API_KEY` unset is supported: health, ingestion, and session APIs remain
+available, parsed issue candidates report `unconfigured`, and the backend makes no Linear
+requests. The key is read only from process configuration and is never persisted, logged, or
+returned by the API.
 
 ## Session ingestion operations
 
@@ -58,6 +66,37 @@ explicit rescan, while the retry timer checks roots currently marked unavailable
 - `POST /api/imports/rescan` starts or coalesces an explicit backfill.
 - `GET /api/sessions?limit=50&offset=0` lists sessions deterministically.
 - `GET /api/sessions/{sessionId}` returns one normalized session or a documented 404.
+
+## Linear attribution
+
+A trimmed session title is attributable only when it begins with the exact grammar
+`<team-key>-<positive-integer>[: <phase>]`. Team keys are letter-led and alphanumeric; issue
+identifiers are normalized to uppercase. Examples are `ENG-215`, `ENG-215: apply`, and
+`eng-215: review`. Phase text is optional, free-form metadata. Identifiers found later in an
+ordinary title, zero or negative numbers, and suffix text without a colon stay unlinked.
+
+The backend reconciles attribution after committed imports, at configured startup, and on an
+explicit request. A valid title can establish the initial link only while the session has no
+stored issue. Once linked, later title changes update the candidate and phase for review but do
+not move or clear the stored issue. Issue lookups are grouped and concurrency-limited. A fresh
+cached summary is reused until `LINEAR_CACHE_TTL_MS`; stale linked summaries are refreshed by
+their stored issue identity during startup or manual synchronization. Confirmed absence becomes
+`not_found` for an unlinked candidate and remains eligible for a later retry. Transient failures
+do not erase an existing committed link.
+
+- `GET /api/linear/status` reports configuration, synchronization state, outcome counts, and
+  sanitized failure categories.
+- `POST /api/linear/sync` starts or coalesces a reconciliation run. It returns `409` with code
+  `linear_unconfigured` when no key is configured.
+- `POST /api/sessions/{sessionId}/relink` explicitly resolves the current valid title candidate
+  and replaces the stored link only after exact success. Missing candidates, stale titles,
+  inaccessible issues, authentication failures, identifier mismatches, and transient failures
+  return sanitized errors while preserving the previous link.
+
+Linear access is strictly read-only. Attribution never changes issues, comments, labels, or
+workflow state. Only the issue ID, identifier, title, URL, team summary, workflow-state summary,
+and synchronization timestamps are cached. Descriptions, comments, attachments, raw SDK
+payloads, credentials, and transcript content are outside the persistence and API boundary.
 
 Persistence and APIs contain source-derived identity, titles, timestamps, turns, and token
 facts, but never transcript text, reasoning, tool arguments, tool results, or raw malformed

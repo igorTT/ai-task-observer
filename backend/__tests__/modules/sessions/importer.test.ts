@@ -41,7 +41,7 @@ async function setup(parserVersion = 2): Promise<{
   await copyFile(fixture, path);
   const database = await AppDatabase.open(join(directory, "test.duckdb"));
   await applyMigrations(database, logger);
-  const repository = new CodexIngestionRepository(database.connection);
+  const repository = new CodexIngestionRepository(database);
   return {
     database,
     repository,

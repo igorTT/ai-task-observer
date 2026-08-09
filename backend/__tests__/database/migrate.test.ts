@@ -47,7 +47,7 @@ describe("migration runner", () => {
     const { database } = await temporaryDatabase();
     await applyMigrations(database, logger);
     const records = await new MigrationRepository(database.connection).findAll();
-    expect(records).toHaveLength(2);
+    expect(records).toHaveLength(3);
     expect(records[0]?.name).toBe("foundation");
     database.close();
   });
@@ -60,8 +60,35 @@ describe("migration runner", () => {
     const reopened = await AppDatabase.open(opened.path);
     await applyMigrations(reopened, logger);
     const records = await new MigrationRepository(reopened.connection).findAll();
-    expect(records).toHaveLength(2);
+    expect(records).toHaveLength(3);
     reopened.close();
+  });
+
+  test("upgrades the existing ingestion schema with attribution tables", async () => {
+    const { database } = await temporaryDatabase();
+    const migrations = await loadMigrations();
+    await applyMigrations(database, logger, migrations.slice(0, 2));
+    await database.connection.run(`
+      INSERT INTO codex_sessions (
+        session_id, source_root, source_path, current_title, import_state, parser_version
+      ) VALUES ('existing', '/root', '/root/existing.jsonl', 'ENG-1', 'ready', 2)
+    `);
+    await applyMigrations(database, logger, migrations);
+    const tables = await database.connection.runAndReadAll(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name IN ('linear_issues', 'linear_session_attributions', 'linear_sync_runs')
+      ORDER BY table_name
+    `);
+    expect(tables.getRowObjects().map((row) => row.table_name)).toEqual([
+      "linear_issues",
+      "linear_session_attributions",
+      "linear_sync_runs",
+    ]);
+    const sessions = await database.connection.runAndReadAll(
+      "SELECT session_id FROM codex_sessions WHERE session_id = 'existing'",
+    );
+    expect(sessions.getRowObjects()).toHaveLength(1);
+    database.close();
   });
 
   test("rejects a changed checksum", async () => {
@@ -80,7 +107,7 @@ describe("migration runner", () => {
     await applyMigrations(database, logger);
     const sql = "CREATE TABLE should_rollback (id INTEGER); INVALID SQL";
     const failing: Migration = {
-      version: 2,
+      version: 4,
       name: "forced-failure",
       sql,
       checksum: createHash("sha256").update(sql).digest("hex"),
@@ -90,12 +117,12 @@ describe("migration runner", () => {
       applyMigrations(database, logger, [...(await loadMigrations()), failing]),
     );
     expect(error).toBeInstanceOf(MigrationError);
-    expect((error as Error).message).toMatch(/Migration 2 \(forced-failure\)/u);
+    expect((error as Error).message).toMatch(/Migration 4 \(forced-failure\)/u);
     const tables = await database.connection.runAndReadAll(
       "SELECT count(*) AS count FROM information_schema.tables WHERE table_name = 'should_rollback'",
     );
     expect(tables.getRowObjects()[0]?.count).toBe(0n);
-    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(2);
+    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(3);
     database.close();
   });
 });

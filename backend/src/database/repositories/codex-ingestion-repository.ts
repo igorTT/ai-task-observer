@@ -1,9 +1,12 @@
 import type { DuckDBConnection } from "@duckdb/node-api";
 
+import type { AppDatabase } from "@/database/database.js";
 import { CodexCheckpointRepository } from "@/database/repositories/codex-checkpoint-repository.js";
 import { CodexImportRunRepository } from "@/database/repositories/codex-import-run-repository.js";
 import { CodexSessionRepository } from "@/database/repositories/codex-session-repository.js";
 import { CodexSessionUsageRepository } from "@/database/repositories/codex-session-usage-repository.js";
+import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
+import type { SessionAttribution } from "@/modules/linear/domain.js";
 import type { SourceChunkMutation } from "@/modules/sessions/domain.js";
 
 export class CodexIngestionRepository {
@@ -12,15 +15,23 @@ export class CodexIngestionRepository {
   public readonly checkpoints: CodexCheckpointRepository;
   public readonly runs: CodexImportRunRepository;
 
-  public constructor(private readonly connection: DuckDBConnection) {
-    this.sessions = new CodexSessionRepository(connection);
-    this.usage = new CodexSessionUsageRepository(connection);
-    this.checkpoints = new CodexCheckpointRepository(connection);
-    this.runs = new CodexImportRunRepository(connection);
+  private readonly connection: DuckDBConnection;
+
+  public constructor(private readonly database: AppDatabase) {
+    this.connection = database.connection;
+    this.sessions = new CodexSessionRepository(this.connection);
+    this.usage = new CodexSessionUsageRepository(this.connection);
+    this.checkpoints = new CodexCheckpointRepository(this.connection);
+    this.runs = new CodexImportRunRepository(this.connection);
   }
 
   public async applySourceChunk(chunk: SourceChunkMutation): Promise<Set<string>> {
+    return this.database.exclusiveWrite(() => this.#applySourceChunk(chunk));
+  }
+
+  async #applySourceChunk(chunk: SourceChunkMutation): Promise<Set<string>> {
     const touched = new Set<string>();
+    const detachedAttributions = await this.#detachAttributions(chunk);
     await this.connection.run("BEGIN TRANSACTION");
     try {
       if (chunk.rebuild) {
@@ -89,6 +100,7 @@ export class CodexIngestionRepository {
         });
       }
       await this.connection.run("COMMIT");
+      await this.#restoreAttributions(detachedAttributions);
       return touched;
     } catch (error) {
       try {
@@ -96,7 +108,35 @@ export class CodexIngestionRepository {
       } catch {
         // Preserve the original transaction failure.
       }
+      await this.#restoreAttributions(detachedAttributions);
       throw error;
+    }
+  }
+
+  async #detachAttributions(chunk: SourceChunkMutation): Promise<SessionAttribution[]> {
+    const sessionIds = new Set(
+      chunk.mutations
+        .map((mutation) => mutation.metadata?.sessionId ?? mutation.sessionId)
+        .filter((sessionId): sessionId is string => sessionId !== undefined),
+    );
+    if (chunk.rebuild) {
+      const pathOwner = await this.sessions.findBySourcePath(chunk.sourcePath);
+      if (pathOwner) sessionIds.add(pathOwner.sessionId);
+    }
+    const repository = new LinearSessionAttributionRepository(this.connection);
+    const attributions = (
+      await Promise.all([...sessionIds].map((sessionId) => repository.findBySessionId(sessionId)))
+    ).filter((attribution): attribution is SessionAttribution => attribution !== undefined);
+    for (const attribution of attributions) {
+      await repository.deleteBySessionId(attribution.sessionId);
+    }
+    return attributions;
+  }
+
+  async #restoreAttributions(attributions: readonly SessionAttribution[]): Promise<void> {
+    const repository = new LinearSessionAttributionRepository(this.connection);
+    for (const attribution of attributions) {
+      if (await this.sessions.findById(attribution.sessionId)) await repository.save(attribution);
     }
   }
 
@@ -114,6 +154,11 @@ export class CodexIngestionRepository {
   }
 
   async #deleteSession(sessionId: string): Promise<void> {
+    const deleteAttribution = await this.connection.prepare(
+      "DELETE FROM linear_session_attributions WHERE session_id = $sessionId",
+    );
+    deleteAttribution.bind({ sessionId });
+    await deleteAttribution.run();
     const deleteUsage = await this.connection.prepare(
       "DELETE FROM codex_session_usage WHERE session_id = $sessionId",
     );

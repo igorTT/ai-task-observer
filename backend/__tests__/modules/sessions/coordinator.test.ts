@@ -32,7 +32,7 @@ async function setup(
   const database = await AppDatabase.open(join(directory, "test.duckdb"));
   databases.push(database);
   await applyMigrations(database, logger);
-  const repository = new CodexIngestionRepository(database.connection);
+  const repository = new CodexIngestionRepository(database);
   const importer = new CodexSourceImporter({ repository, readChunkBytes: 256, logger });
   const coordinator = new IngestionCoordinator({
     roots,

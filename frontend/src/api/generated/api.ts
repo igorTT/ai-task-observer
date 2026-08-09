@@ -16,6 +16,15 @@ const injectedRtkApi = api.injectEndpoints({
     detail: build.query<DetailApiResponse, DetailApiArg>({
       query: (queryArg) => ({ url: `/api/sessions/${queryArg.sessionId}` }),
     }),
+    relink: build.mutation<RelinkApiResponse, RelinkApiArg>({
+      query: (queryArg) => ({ url: `/api/sessions/${queryArg.sessionId}/relink`, method: "POST" }),
+    }),
+    status: build.query<StatusApiResponse, StatusApiArg>({
+      query: () => ({ url: `/api/linear/status` }),
+    }),
+    sync: build.mutation<SyncApiResponse, SyncApiArg>({
+      query: () => ({ url: `/api/linear/sync`, method: "POST" }),
+    }),
     importStatus: build.query<ImportStatusApiResponse, ImportStatusApiArg>({
       query: () => ({ url: `/api/imports/status` }),
     }),
@@ -37,12 +46,60 @@ export type DetailApiResponse = /** status 200 Session detail */ SessionResponse
 export type DetailApiArg = {
   sessionId: string;
 };
+export type RelinkApiResponse =
+  /** status 200 Session attribution relinked */ SessionRelinkResponse;
+export type RelinkApiArg = {
+  sessionId: string;
+};
+export type StatusApiResponse = /** status 200 Linear integration status */ LinearStatusResponse;
+export type StatusApiArg = void;
+export type SyncApiResponse = /** status 202 Synchronization accepted */ LinearSyncResponse;
+export type SyncApiArg = void;
 export type ImportStatusApiResponse = /** status 200 Status */ ImportStatusResponse;
 export type ImportStatusApiArg = void;
 export type RescanApiResponse = /** status 202 Accepted */ RescanResponse;
 export type RescanApiArg = void;
 export type HealthResponse = {
   status: "healthy";
+};
+export type AttributionStatus =
+  "unlinked" | "unconfigured" | "pending" | "linked" | "not_found" | "error";
+export type LinearIssueResponse = {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  team: {
+    name: string;
+    key: string;
+    id: string;
+  };
+  state: {
+    name: string;
+    id: string;
+  };
+  updatedAt: string;
+  synchronizedAt: string;
+};
+export type LinearFailureCategory =
+  | "authentication"
+  | "rate_limit"
+  | "network"
+  | "timeout"
+  | "upstream"
+  | "identifier_mismatch"
+  | "unknown";
+export type SessionAttributionResponse = {
+  status: AttributionStatus;
+  candidateIdentifier?: string;
+  phase?: string;
+  issue?: LinearIssueResponse;
+  relinkRequired: boolean;
+  lastAttemptAt?: string;
+  lastSuccessAt?: string;
+  synchronizationState:
+    "unlinked" | "unconfigured" | "pending" | "synchronized" | "not_found" | "error";
+  failureCategory?: LinearFailureCategory;
 };
 export type SessionResponse = {
   sessionId: string;
@@ -56,6 +113,7 @@ export type SessionResponse = {
   totalTokens: string;
   usageObserved: boolean;
   importState: string;
+  attribution: SessionAttributionResponse;
 };
 export type SessionPageResponse = {
   items: SessionResponse[];
@@ -68,6 +126,49 @@ export type ErrorResponse = {
     message: string;
     code: string;
   };
+};
+export type SessionRelinkResponse = {
+  attribution: SessionAttributionResponse;
+};
+export type SessionRelinkErrorResponse = {
+  error: {
+    failureCategory?: LinearFailureCategory;
+    message: string;
+    code: string;
+  };
+};
+export type RecordAttributionStatusNumber = {
+  unlinked: number;
+  unconfigured: number;
+  pending: number;
+  linked: number;
+  not_found: number;
+  error: number;
+};
+export type LinearSyncRunResponse = {
+  runId: string;
+  trigger: string;
+  state: string;
+  candidateCount: number;
+  linkedCount: number;
+  notFoundCount: number;
+  errorCount: number;
+  failureCategory?: LinearFailureCategory;
+  startedAt?: string;
+  completedAt?: string;
+};
+export type LinearStatusResponse = {
+  configured: boolean;
+  state: string;
+  acceptingWork: boolean;
+  counts: RecordAttributionStatusNumber;
+  currentRun?: LinearSyncRunResponse;
+  lastCompletedRun?: LinearSyncRunResponse;
+};
+export type LinearSyncResponse = {
+  runId: string;
+  state: "queued" | "running";
+  coalesced: boolean;
 };
 export type RootStatusResponse = {
   root: string;
@@ -113,6 +214,9 @@ export const {
   useGetHealthQuery,
   useListQuery,
   useDetailQuery,
+  useRelinkMutation,
+  useStatusQuery,
+  useSyncMutation,
   useImportStatusQuery,
   useRescanMutation,
 } = injectedRtkApi;

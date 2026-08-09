@@ -29,7 +29,7 @@ async function setup(): Promise<{
   const database = await AppDatabase.open(join(directory, "test.duckdb"));
   databases.push(database);
   await applyMigrations(database, logger);
-  const repository = new CodexIngestionRepository(database.connection);
+  const repository = new CodexIngestionRepository(database);
   const ingestion = {
     status(): Promise<IngestionStatusSnapshot> {
       return Promise.resolve({
@@ -56,6 +56,24 @@ async function setup(): Promise<{
       api: {
         ingestion,
         sessions: new SessionQueryService(repository.sessions, repository.usage),
+        linear: {
+          status: () =>
+            Promise.resolve({
+              configured: false,
+              state: "unconfigured" as const,
+              acceptingWork: true,
+              counts: {
+                unlinked: 0,
+                unconfigured: 0,
+                pending: 0,
+                linked: 0,
+                not_found: 0,
+                error: 0,
+              },
+            }),
+          sync: () => Promise.reject(new Error("Linear integration is not configured")),
+          relink: () => Promise.reject(new Error("Linear integration is not configured")),
+        },
       },
     }),
     repository,
