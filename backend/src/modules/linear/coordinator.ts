@@ -150,11 +150,13 @@ export class AttributionCoordinator {
   }
 
   public async status(): Promise<LinearStatusSnapshot> {
-    const [currentRun, lastCompletedRun, counts] = await Promise.all([
-      this.#currentRunId ? this.#runs.find(this.#currentRunId) : undefined,
-      this.#runs.latestCompleted(),
-      this.#attributions.counts(),
-    ]);
+    const { currentRun, lastCompletedRun, counts } = await this.#database.exclusiveWrite(
+      async () => ({
+        currentRun: this.#currentRunId ? await this.#runs.find(this.#currentRunId) : undefined,
+        lastCompletedRun: await this.#runs.latestCompleted(),
+        counts: await this.#attributions.counts(),
+      }),
+    );
     return {
       configured: this.#reader !== undefined,
       state: !this.#reader
@@ -188,9 +190,10 @@ export class AttributionCoordinator {
     await this.#database.exclusiveWrite(() => this.#runs.create(runId, trigger));
     const active = this.#executeRun(runId);
     this.#activePromise = active;
-    void active.finally(() => {
+    const remove = (): void => {
       if (this.#activePromise === active) this.#activePromise = undefined;
-    });
+    };
+    void active.then(remove, remove);
     return runId;
   }
 

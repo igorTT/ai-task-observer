@@ -252,6 +252,35 @@ describe("AttributionCoordinator", () => {
     expect((await opened.coordinator.status()).acceptingWork).toBe(false);
   });
 
+  test("serializes status reads behind active database work", async () => {
+    const opened = await setup([]);
+    let release!: () => void;
+    let markStarted!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const active = opened.database.exclusiveWrite(async () => {
+      markStarted();
+      await pending;
+    });
+    await started;
+
+    let statusSettled = false;
+    const status = opened.coordinator.status().then((snapshot) => {
+      statusSettled = true;
+      return snapshot;
+    });
+    await Bun.sleep(10);
+    expect(statusSettled).toBe(false);
+
+    release();
+    await active;
+    expect((await status).state).toBe("unconfigured");
+  });
+
   test("keeps a stored link sticky across candidate, phase, and ordinary-title changes", async () => {
     const calls: string[] = [];
     const opened = await setup(["ENG-215: explore"], {
