@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "bad",
+  "currency": "USD",
+  "tokenUnit": 1000000,
+  "models": [
+    {
+      "id": "",
+      "aliases": [],
+      "prices": [
+        {
+          "effectiveFrom": "2026-01-01T00:00:00Z",
+          "effectiveTo": null,
+          "uncachedInputUsdPerUnit": "1",
+          "cachedInputUsdPerUnit": "1",
+          "outputUsdPerUnit": "1"
+        }
+      ]
+    }
+  ]
+}

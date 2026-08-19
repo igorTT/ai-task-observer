@@ -11,8 +11,11 @@ import {
 } from "@/modules/sessions/source-reader.js";
 import type {
   ParserDiagnostics,
+  SelectedSessionEvent,
   SessionMutation,
+  SourceParseState,
   SourceChunkMutation,
+  UsageObservation,
 } from "@/modules/sessions/domain.js";
 
 export interface ImportSourceResult {
@@ -85,6 +88,9 @@ export class CodexSourceImporter {
     let sessionId: string | undefined;
     let recordNumber = 0;
     const mutations: SessionMutation[] = [];
+    const events: SelectedSessionEvent[] = [];
+    const observations: UsageObservation[] = [];
+    let parseState: SourceParseState | undefined;
     const diagnostics = emptyDiagnostics();
 
     while (offset < source.size) {
@@ -93,17 +99,23 @@ export class CodexSourceImporter {
       const parsed = parseCodexRecords(range.records, {
         sourceRoot,
         sourcePath,
+        sourceIdentity: source.key,
         ...(sessionId ? { sessionId } : {}),
         startRecordNumber: recordNumber,
         parserVersion: this.#parserVersion,
+        ...(parseState ? { parseState } : {}),
       });
       sessionId = parsed.sessionId ?? sessionId;
       mutations.push(...parsed.mutations);
+      events.push(...parsed.events);
+      observations.push(...parsed.observations);
+      parseState = parsed.parseState ?? parseState;
       mergeDiagnostics(diagnostics, parsed.diagnostics);
       recordNumber += range.records.length;
       offset = range.completeOffset;
     }
     if (!sessionId) throw new Error("Codex source did not provide a stable session identity");
+    if (!parseState) throw new Error("Codex source did not produce parser state");
     ensureMetadataMutation(mutations, sessionId, sourceRoot, sourcePath);
 
     const chunk = sourceChunk({
@@ -112,6 +124,9 @@ export class CodexSourceImporter {
       source,
       offset,
       mutations,
+      events,
+      observations,
+      parseState,
       diagnostics,
       rebuild: true,
       ...(runId ? { runId } : {}),
@@ -140,6 +155,8 @@ export class CodexSourceImporter {
     const sessions = new Set<string>();
     let unknownRecords = checkpoint.unknownRecords;
     let malformedRecords = checkpoint.malformedRecords;
+    let parseState = await this.#repository.parseStates.find(sourcePath);
+    if (!parseState) throw new Error("Committed checkpoint is missing parser state");
 
     while (offset < source.size) {
       const range = await readCompleteRecords(sourcePath, offset, this.#readChunkBytes);
@@ -147,13 +164,17 @@ export class CodexSourceImporter {
       const parsed = parseCodexRecords(range.records, {
         sourceRoot,
         sourcePath,
+        sourceIdentity: source.key,
         ...(sessionId ? { sessionId } : {}),
         parserVersion: this.#parserVersion,
+        parseState,
       });
       sessionId = parsed.sessionId ?? sessionId;
       if (!sessionId) throw new Error("Appended range has no known session identity");
       unknownRecords += parsed.diagnostics.unknownRecords;
       malformedRecords += parsed.diagnostics.malformedRecords;
+      if (!parsed.parseState) throw new Error("Appended range did not produce parser state");
+      parseState = parsed.parseState;
       const diagnostics = {
         unknownRecords,
         malformedRecords,
@@ -166,6 +187,9 @@ export class CodexSourceImporter {
           source,
           offset: range.completeOffset,
           mutations: parsed.mutations,
+          events: parsed.events,
+          observations: parsed.observations,
+          parseState,
           diagnostics,
           rebuild: false,
           ...(runId ? { runId } : {}),
@@ -218,6 +242,9 @@ function sourceChunk(input: {
   source: Awaited<ReturnType<typeof inspectSource>>;
   offset: bigint;
   mutations: readonly SessionMutation[];
+  events: readonly SelectedSessionEvent[];
+  observations: readonly UsageObservation[];
+  parseState: SourceParseState;
   diagnostics: ParserDiagnostics;
   rebuild: boolean;
   runId?: string;
@@ -232,6 +259,9 @@ function sourceChunk(input: {
     observedModifiedAtMs: input.source.modifiedAtMs,
     parserVersion: input.parserVersion,
     mutations: input.mutations,
+    events: input.events,
+    observations: input.observations,
+    parseState: input.parseState,
     diagnostics: input.diagnostics,
     rebuild: input.rebuild,
     ...(input.runId ? { runId: input.runId } : {}),

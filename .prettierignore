@@ -2,6 +2,7 @@ node_modules
 dist
 coverage
 .codex
+.agents
 openspec
 backend/generated
 backend/src/api/generated

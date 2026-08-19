@@ -96,11 +96,13 @@ do not erase an existing committed link.
 Linear access is strictly read-only. Attribution never changes issues, comments, labels, or
 workflow state. Only the issue ID, identifier, title, URL, team summary, workflow-state summary,
 and synchronization timestamps are cached. Descriptions, comments, attachments, raw SDK
-payloads, credentials, and transcript content are outside the persistence and API boundary.
+payloads, and credentials are outside the Linear persistence and API boundary. The Linear
+integration never reads or exposes selected Codex message-event content.
 
-Persistence and APIs contain source-derived identity, titles, timestamps, turns, and token
-facts, but never transcript text, reasoning, tool arguments, tool results, or raw malformed
-records.
+For the internal POC, persistence may contain selected explicit user and assistant message events
+in addition to source-derived identity, titles, timestamps, turns, and token facts. Session APIs
+never expose those messages. Reasoning, tool arguments/results, credentials, opaque source
+records, and malformed payloads remain excluded from persistence, logs, diagnostics, and APIs.
 
 ## Migrations
 

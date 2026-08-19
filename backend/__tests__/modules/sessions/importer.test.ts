@@ -3,14 +3,13 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
-  readFile,
   realpath,
   rename,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, test } from "bun:test";
@@ -26,7 +25,7 @@ const fixture = fileURLToPath(new URL("../../fixtures/codex/valid-session.jsonl"
 const directories: string[] = [];
 const logger = pino({ enabled: false });
 
-async function setup(parserVersion = 2): Promise<{
+async function setup(parserVersion = 3): Promise<{
   database: AppDatabase;
   repository: CodexIngestionRepository;
   importer: CodexSourceImporter;
@@ -72,7 +71,8 @@ describe("Codex source importer", () => {
       inputTokens: 150n,
       cachedInputTokens: 25n,
       outputTokens: 40n,
-      totalTokens: 215n,
+      uncachedInputTokens: 125n,
+      totalTokens: 190n,
     });
     expect((await opened.importer.importSource(opened.root, opened.path)).state).toBe("unchanged");
 
@@ -85,7 +85,7 @@ describe("Codex source importer", () => {
       developerTurns: 2n,
     });
     expect(await opened.repository.usage.findBySessionId("session-001")).toMatchObject({
-      totalTokens: 280n,
+      totalTokens: 250n,
     });
     await opened.importer.importSource(opened.root, opened.path);
     expect((await opened.repository.sessions.findById("session-001"))?.developerTurns).toBe(2n);
@@ -107,6 +107,53 @@ describe("Codex source importer", () => {
     opened.database.close();
   });
 
+  test("resumes model and cumulative state from the committed checkpoint after restart", async () => {
+    const opened = await setup();
+    await opened.importer.importSource(opened.root, opened.path);
+    const checkpoint = await opened.repository.checkpoints.find(opened.path);
+    opened.database.close();
+    await appendFile(
+      opened.path,
+      `${JSON.stringify({
+        timestamp: "2026-01-02T03:11:00.000Z",
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: {
+              input_tokens: 200,
+              cached_input_tokens: 30,
+              output_tokens: 50,
+            },
+            last_token_usage: {
+              input_tokens: 50,
+              cached_input_tokens: 5,
+              output_tokens: 10,
+            },
+          },
+        },
+      })}\n`,
+    );
+    const database = await AppDatabase.open(join(dirname(opened.root), "test.duckdb"));
+    const repository = new CodexIngestionRepository(database);
+    const importer = new CodexSourceImporter({ repository, readChunkBytes: 128, logger });
+    await importer.importSource(opened.root, opened.path);
+    expect(await repository.checkpoints.find(opened.path)).toMatchObject({
+      parserVersion: 3,
+    });
+    expect((await repository.checkpoints.find(opened.path))?.committedOffset).toBeGreaterThan(
+      checkpoint?.committedOffset ?? 0n,
+    );
+    expect((await repository.observations.listBySessionId("session-001")).at(-1)).toMatchObject({
+      model: "synthetic-model",
+      normalized: { input: 50n, cachedInput: 5n, output: 10n, total: 60n },
+    });
+    expect(await repository.usage.findBySessionId("session-001")).toMatchObject({
+      totalTokens: 250n,
+    });
+    database.close();
+  });
+
   test("rebuilds on truncation and preserves the previous snapshot on failed replacement", async () => {
     const opened = await setup();
     await opened.importer.importSource(opened.root, opened.path);
@@ -120,7 +167,7 @@ describe("Codex source importer", () => {
       developerTurns: 0n,
     });
     expect(await opened.repository.usage.findBySessionId("session-001")).toMatchObject({
-      totalTokens: 0n,
+      totalTokens: null,
       usageObserved: false,
     });
 
@@ -178,11 +225,11 @@ describe("Codex source importer", () => {
       developerTurns: 1n,
     });
     expect(await opened.repository.usage.findBySessionId("session-002")).toMatchObject({
-      totalTokens: 6n,
+      totalTokens: 5n,
     });
     expect(await opened.repository.checkpoints.find(opened.path)).toMatchObject({
       status: "ready",
-      parserVersion: 2,
+      parserVersion: 3,
     });
     opened.database.close();
   });
@@ -199,7 +246,7 @@ describe("Codex source importer", () => {
       developerTurns: 1n,
     });
     expect(await opened.repository.usage.findBySessionId("session-001")).toMatchObject({
-      totalTokens: 215n,
+      totalTokens: 190n,
     });
     opened.database.close();
   });
@@ -223,13 +270,13 @@ describe("Codex source importer", () => {
       inputTokens: 7n,
       cachedInputTokens: 2n,
       outputTokens: 1n,
-      totalTokens: 10n,
+      totalTokens: 8n,
       usageObserved: true,
     });
     opened.database.close();
   });
 
-  test("never persists synthetic private fixture markers", async () => {
+  test("persists selected messages but never excluded fixture payloads", async () => {
     const opened = await setup();
     await opened.importer.importSource(opened.root, opened.path);
     const tables = [
@@ -237,14 +284,23 @@ describe("Codex source importer", () => {
       "codex_session_usage",
       "codex_import_checkpoints",
       "codex_import_runs",
+      "codex_session_events",
+      "codex_usage_observations",
+      "codex_source_parse_state",
     ];
     const serialized: string[] = [];
     for (const table of tables) {
       const reader = await opened.database.connection.runAndReadAll(`SELECT * FROM ${table}`);
       serialized.push(JSON.stringify(reader.getRowObjects(), jsonSafeReplacer));
     }
-    const source = await readFile(fixture, "utf8");
-    for (const marker of source.match(/SYNTHETIC_PRIVATE_[A-Z_]+/gu) ?? []) {
+    expect(serialized.join("\n")).toContain("SYNTHETIC_PRIVATE_PROMPT");
+    expect(serialized.join("\n")).toContain("SYNTHETIC_PRIVATE_RESPONSE");
+    for (const marker of [
+      "SYNTHETIC_PRIVATE_DEVELOPER",
+      "SYNTHETIC_PRIVATE_TOOL_ARGUMENT",
+      "SYNTHETIC_PRIVATE_TOOL_RESULT",
+      "SYNTHETIC_PRIVATE_UNKNOWN",
+    ]) {
       expect(serialized.join("\n")).not.toContain(marker);
     }
     opened.database.close();

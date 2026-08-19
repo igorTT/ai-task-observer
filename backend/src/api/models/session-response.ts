@@ -6,13 +6,24 @@ export interface SessionResponse {
   readonly startedAt?: string;
   readonly endedAt?: string;
   readonly developerTurns: string;
-  readonly inputTokens: string;
-  readonly cachedInputTokens: string;
-  readonly outputTokens: string;
-  readonly totalTokens: string;
+  readonly inputTokens: string | null;
+  readonly cachedInputTokens: string | null;
+  readonly uncachedInputTokens: string | null;
+  readonly outputTokens: string | null;
+  readonly totalTokens: string | null;
   readonly usageObserved: boolean;
+  readonly tokenCompleteness: TokenCompletenessResponse;
+  readonly usageAnomalies: readonly string[];
   readonly importState: string;
   readonly attribution: SessionAttributionResponse;
+}
+
+export interface TokenCompletenessResponse {
+  readonly input: boolean;
+  readonly cachedInput: boolean;
+  readonly uncachedInput: boolean;
+  readonly output: boolean;
+  readonly total: boolean;
 }
 
 export interface SessionPageResponse {

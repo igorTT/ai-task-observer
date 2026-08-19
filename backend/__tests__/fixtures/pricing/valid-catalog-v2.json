@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "fixture-v2",
+  "currency": "USD",
+  "tokenUnit": 1000000,
+  "models": [
+    {
+      "id": "model-a",
+      "aliases": ["model-a-alias"],
+      "prices": [
+        {
+          "effectiveFrom": "2026-01-01T00:00:00Z",
+          "effectiveTo": null,
+          "uncachedInputUsdPerUnit": "20.00",
+          "cachedInputUsdPerUnit": "5.00",
+          "outputUsdPerUnit": "80.00"
+        }
+      ]
+    }
+  ]
+}

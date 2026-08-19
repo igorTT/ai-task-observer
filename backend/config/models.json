@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026-08-19",
+  "currency": "USD",
+  "tokenUnit": 1000000,
+  "models": [
+    {
+      "id": "gpt-5.6-sol",
+      "aliases": ["gpt-5.6"],
+      "prices": [
+        {
+          "effectiveFrom": "2026-08-19T00:00:00Z",
+          "effectiveTo": null,
+          "uncachedInputUsdPerUnit": "5.00",
+          "cachedInputUsdPerUnit": "0.50",
+          "outputUsdPerUnit": "30.00"
+        }
+      ]
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "aliases": [],
+      "prices": [
+        {
+          "effectiveFrom": "2026-08-19T00:00:00Z",
+          "effectiveTo": null,
+          "uncachedInputUsdPerUnit": "2.00",
+          "cachedInputUsdPerUnit": "0.20",
+          "outputUsdPerUnit": "12.00"
+        }
+      ]
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "aliases": [],
+      "prices": [
+        {
+          "effectiveFrom": "2026-08-19T00:00:00Z",
+          "effectiveTo": null,
+          "uncachedInputUsdPerUnit": "0.20",
+          "cachedInputUsdPerUnit": "0.02",
+          "outputUsdPerUnit": "1.20"
+        }
+      ]
+    }
+  ]
+}

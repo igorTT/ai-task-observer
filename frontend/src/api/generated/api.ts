@@ -31,6 +31,15 @@ const injectedRtkApi = api.injectEndpoints({
     rescan: build.mutation<RescanApiResponse, RescanApiArg>({
       query: () => ({ url: `/api/imports/rescan`, method: "POST" }),
     }),
+    costCalculationStatus: build.query<
+      CostCalculationStatusApiResponse,
+      CostCalculationStatusApiArg
+    >({
+      query: () => ({ url: `/api/costs/status` }),
+    }),
+    recalculateCosts: build.mutation<RecalculateCostsApiResponse, RecalculateCostsApiArg>({
+      query: () => ({ url: `/api/costs/recalculate`, method: "POST" }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -59,8 +68,20 @@ export type ImportStatusApiResponse = /** status 200 Status */ ImportStatusRespo
 export type ImportStatusApiArg = void;
 export type RescanApiResponse = /** status 202 Accepted */ RescanResponse;
 export type RescanApiArg = void;
+export type CostCalculationStatusApiResponse =
+  /** status 200 Status */ CostCalculationStatusResponse;
+export type CostCalculationStatusApiArg = void;
+export type RecalculateCostsApiResponse = /** status 202 Accepted */ RecalculateCostResponse;
+export type RecalculateCostsApiArg = void;
 export type HealthResponse = {
   status: "healthy";
+};
+export type TokenCompletenessResponse = {
+  input: boolean;
+  cachedInput: boolean;
+  uncachedInput: boolean;
+  output: boolean;
+  total: boolean;
 };
 export type AttributionStatus =
   "unlinked" | "unconfigured" | "pending" | "linked" | "not_found" | "error";
@@ -107,11 +128,14 @@ export type SessionResponse = {
   startedAt?: string;
   endedAt?: string;
   developerTurns: string;
-  inputTokens: string;
-  cachedInputTokens: string;
-  outputTokens: string;
-  totalTokens: string;
+  inputTokens: string | null;
+  cachedInputTokens: string | null;
+  uncachedInputTokens: string | null;
+  outputTokens: string | null;
+  totalTokens: string | null;
   usageObserved: boolean;
+  tokenCompleteness: TokenCompletenessResponse;
+  usageAnomalies: string[];
   importState: string;
   attribution: SessionAttributionResponse;
 };
@@ -210,6 +234,47 @@ export type RescanResponse = {
   state: "queued" | "running";
   coalesced: boolean;
 };
+export type CostGenerationResponse = {
+  generationId: string;
+  sourceFactRevision: string;
+  state: "running" | "completed" | "failed";
+  pricingSchemaVersion: number;
+  pricingCatalogVersion: string;
+  pricingContentHash: string;
+  calculatorVersion: string;
+  tokenUnit: string;
+  startedAt: string;
+  completedAt?: string;
+  failureCategory?: "calculation_failed";
+};
+export type CostWorkResponse = {
+  generationId: string;
+  state: "running" | "queued";
+};
+export type CostConfigurationResponse = {
+  schemaVersion: number;
+  catalogVersion: string;
+  contentHash: string;
+  currency: "USD";
+  tokenUnit: string;
+};
+export type CostCalculationStatusResponse = {
+  estimateKind: "configured_api_equivalent_usd";
+  latestCompleted?: CostGenerationResponse;
+  active?: CostWorkResponse;
+  queued?: CostWorkResponse;
+  latestFailure?: CostGenerationResponse;
+  currentFactRevision: string;
+  coverage: "current" | "stale" | "missing";
+  config: CostConfigurationResponse;
+  calculatorVersion: string;
+  acceptingWork: boolean;
+};
+export type RecalculateCostResponse = {
+  generationId: string;
+  state: "running" | "queued";
+  coalesced: boolean;
+};
 export const {
   useGetHealthQuery,
   useListQuery,
@@ -219,4 +284,6 @@ export const {
   useSyncMutation,
   useImportStatusQuery,
   useRescanMutation,
+  useCostCalculationStatusQuery,
+  useRecalculateCostsMutation,
 } = injectedRtkApi;

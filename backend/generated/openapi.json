@@ -23,6 +23,34 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"TokenCompletenessResponse": {
+				"properties": {
+					"input": {
+						"type": "boolean"
+					},
+					"cachedInput": {
+						"type": "boolean"
+					},
+					"uncachedInput": {
+						"type": "boolean"
+					},
+					"output": {
+						"type": "boolean"
+					},
+					"total": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"input",
+					"cachedInput",
+					"uncachedInput",
+					"output",
+					"total"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"AttributionStatus": {
 				"type": "string",
 				"enum": [
@@ -178,19 +206,36 @@
 						"type": "string"
 					},
 					"inputTokens": {
-						"type": "string"
+						"type": "string",
+						"nullable": true
 					},
 					"cachedInputTokens": {
-						"type": "string"
+						"type": "string",
+						"nullable": true
+					},
+					"uncachedInputTokens": {
+						"type": "string",
+						"nullable": true
 					},
 					"outputTokens": {
-						"type": "string"
+						"type": "string",
+						"nullable": true
 					},
 					"totalTokens": {
-						"type": "string"
+						"type": "string",
+						"nullable": true
 					},
 					"usageObserved": {
 						"type": "boolean"
+					},
+					"tokenCompleteness": {
+						"$ref": "#/components/schemas/TokenCompletenessResponse"
+					},
+					"usageAnomalies": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
 					},
 					"importState": {
 						"type": "string"
@@ -204,9 +249,12 @@
 					"developerTurns",
 					"inputTokens",
 					"cachedInputTokens",
+					"uncachedInputTokens",
 					"outputTokens",
 					"totalTokens",
 					"usageObserved",
+					"tokenCompleteness",
+					"usageAnomalies",
 					"importState",
 					"attribution"
 				],
@@ -618,6 +666,196 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"CostGenerationResponse": {
+				"properties": {
+					"generationId": {
+						"type": "string"
+					},
+					"sourceFactRevision": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"running",
+							"completed",
+							"failed"
+						]
+					},
+					"pricingSchemaVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"pricingCatalogVersion": {
+						"type": "string"
+					},
+					"pricingContentHash": {
+						"type": "string"
+					},
+					"calculatorVersion": {
+						"type": "string"
+					},
+					"tokenUnit": {
+						"type": "string"
+					},
+					"startedAt": {
+						"type": "string"
+					},
+					"completedAt": {
+						"type": "string"
+					},
+					"failureCategory": {
+						"type": "string",
+						"enum": [
+							"calculation_failed"
+						],
+						"nullable": false
+					}
+				},
+				"required": [
+					"generationId",
+					"sourceFactRevision",
+					"state",
+					"pricingSchemaVersion",
+					"pricingCatalogVersion",
+					"pricingContentHash",
+					"calculatorVersion",
+					"tokenUnit",
+					"startedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CostWorkResponse": {
+				"properties": {
+					"generationId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"running",
+							"queued"
+						]
+					}
+				},
+				"required": [
+					"generationId",
+					"state"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CostConfigurationResponse": {
+				"properties": {
+					"schemaVersion": {
+						"type": "number",
+						"format": "double"
+					},
+					"catalogVersion": {
+						"type": "string"
+					},
+					"contentHash": {
+						"type": "string"
+					},
+					"currency": {
+						"type": "string",
+						"enum": [
+							"USD"
+						],
+						"nullable": false
+					},
+					"tokenUnit": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"schemaVersion",
+					"catalogVersion",
+					"contentHash",
+					"currency",
+					"tokenUnit"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CostCalculationStatusResponse": {
+				"properties": {
+					"estimateKind": {
+						"type": "string",
+						"enum": [
+							"configured_api_equivalent_usd"
+						],
+						"nullable": false
+					},
+					"latestCompleted": {
+						"$ref": "#/components/schemas/CostGenerationResponse"
+					},
+					"active": {
+						"$ref": "#/components/schemas/CostWorkResponse"
+					},
+					"queued": {
+						"$ref": "#/components/schemas/CostWorkResponse"
+					},
+					"latestFailure": {
+						"$ref": "#/components/schemas/CostGenerationResponse"
+					},
+					"currentFactRevision": {
+						"type": "string"
+					},
+					"coverage": {
+						"type": "string",
+						"enum": [
+							"current",
+							"stale",
+							"missing"
+						]
+					},
+					"config": {
+						"$ref": "#/components/schemas/CostConfigurationResponse"
+					},
+					"calculatorVersion": {
+						"type": "string"
+					},
+					"acceptingWork": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"estimateKind",
+					"currentFactRevision",
+					"coverage",
+					"config",
+					"calculatorVersion",
+					"acceptingWork"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"RecalculateCostResponse": {
+				"properties": {
+					"generationId": {
+						"type": "string"
+					},
+					"state": {
+						"type": "string",
+						"enum": [
+							"running",
+							"queued"
+						]
+					},
+					"coalesced": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"generationId",
+					"state",
+					"coalesced"
+				],
+				"type": "object",
+				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {}
@@ -908,6 +1146,50 @@
 				},
 				"tags": [
 					"Imports"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/costs/status": {
+			"get": {
+				"operationId": "CostCalculationStatus",
+				"responses": {
+					"200": {
+						"description": "Status",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CostCalculationStatusResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Costs"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/api/costs/recalculate": {
+			"post": {
+				"operationId": "RecalculateCosts",
+				"responses": {
+					"202": {
+						"description": "Accepted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RecalculateCostResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Costs"
 				],
 				"security": [],
 				"parameters": []

@@ -144,7 +144,7 @@ describe("AttributionCoordinator", () => {
       phase: "apply",
     });
     expect(await opened.ingestion.usage.findBySessionId("session-1")).toMatchObject({
-      totalTokens: 15n,
+      totalTokens: 13n,
     });
     await opened.coordinator.close();
   });

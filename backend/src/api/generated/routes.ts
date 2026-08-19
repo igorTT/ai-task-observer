@@ -11,6 +11,8 @@ import { SessionsController } from './../controllers/sessions.controller.js';
 import { LinearController } from './../controllers/linear.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ImportsController } from './../controllers/imports.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { CostsController } from './../controllers/costs.controller.js';
 import type { Request as ExRequest, Response as ExResponse, RequestHandler, Router } from 'express';
 
 
@@ -22,6 +24,18 @@ const models: TsoaRoute.Models = {
         "dataType": "refObject",
         "properties": {
             "status": {"dataType":"enum","enums":["healthy"],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TokenCompletenessResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "input": {"dataType":"boolean","required":true},
+            "cachedInput": {"dataType":"boolean","required":true},
+            "uncachedInput": {"dataType":"boolean","required":true},
+            "output": {"dataType":"boolean","required":true},
+            "total": {"dataType":"boolean","required":true},
         },
         "additionalProperties": false,
     },
@@ -75,11 +89,14 @@ const models: TsoaRoute.Models = {
             "startedAt": {"dataType":"string"},
             "endedAt": {"dataType":"string"},
             "developerTurns": {"dataType":"string","required":true},
-            "inputTokens": {"dataType":"string","required":true},
-            "cachedInputTokens": {"dataType":"string","required":true},
-            "outputTokens": {"dataType":"string","required":true},
-            "totalTokens": {"dataType":"string","required":true},
+            "inputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "cachedInputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "uncachedInputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "outputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "totalTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
             "usageObserved": {"dataType":"boolean","required":true},
+            "tokenCompleteness": {"ref":"TokenCompletenessResponse","required":true},
+            "usageAnomalies": {"dataType":"array","array":{"dataType":"string"},"required":true},
             "importState": {"dataType":"string","required":true},
             "attribution": {"ref":"SessionAttributionResponse","required":true},
         },
@@ -226,6 +243,72 @@ const models: TsoaRoute.Models = {
         "properties": {
             "runId": {"dataType":"string","required":true},
             "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["queued"]},{"dataType":"enum","enums":["running"]}],"required":true},
+            "coalesced": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CostGenerationResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "generationId": {"dataType":"string","required":true},
+            "sourceFactRevision": {"dataType":"string","required":true},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["running"]},{"dataType":"enum","enums":["completed"]},{"dataType":"enum","enums":["failed"]}],"required":true},
+            "pricingSchemaVersion": {"dataType":"double","required":true},
+            "pricingCatalogVersion": {"dataType":"string","required":true},
+            "pricingContentHash": {"dataType":"string","required":true},
+            "calculatorVersion": {"dataType":"string","required":true},
+            "tokenUnit": {"dataType":"string","required":true},
+            "startedAt": {"dataType":"string","required":true},
+            "completedAt": {"dataType":"string"},
+            "failureCategory": {"dataType":"enum","enums":["calculation_failed"]},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CostWorkResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "generationId": {"dataType":"string","required":true},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["running"]},{"dataType":"enum","enums":["queued"]}],"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CostConfigurationResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "schemaVersion": {"dataType":"double","required":true},
+            "catalogVersion": {"dataType":"string","required":true},
+            "contentHash": {"dataType":"string","required":true},
+            "currency": {"dataType":"enum","enums":["USD"],"required":true},
+            "tokenUnit": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CostCalculationStatusResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "estimateKind": {"dataType":"enum","enums":["configured_api_equivalent_usd"],"required":true},
+            "latestCompleted": {"ref":"CostGenerationResponse"},
+            "active": {"ref":"CostWorkResponse"},
+            "queued": {"ref":"CostWorkResponse"},
+            "latestFailure": {"ref":"CostGenerationResponse"},
+            "currentFactRevision": {"dataType":"string","required":true},
+            "coverage": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["current"]},{"dataType":"enum","enums":["stale"]},{"dataType":"enum","enums":["missing"]}],"required":true},
+            "config": {"ref":"CostConfigurationResponse","required":true},
+            "calculatorVersion": {"dataType":"string","required":true},
+            "acceptingWork": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "RecalculateCostResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "generationId": {"dataType":"string","required":true},
+            "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["running"]},{"dataType":"enum","enums":["queued"]}],"required":true},
             "coalesced": {"dataType":"boolean","required":true},
         },
         "additionalProperties": false,
@@ -473,6 +556,64 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'rescan',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 202,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCostsController_costCalculationStatus: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/costs/status',
+            ...(fetchMiddlewares<RequestHandler>(CostsController)),
+            ...(fetchMiddlewares<RequestHandler>(CostsController.prototype.costCalculationStatus)),
+
+            async function CostsController_costCalculationStatus(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCostsController_costCalculationStatus, request, response });
+
+                const controller = new CostsController();
+
+              await templateService.apiHandler({
+                methodName: 'costCalculationStatus',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCostsController_recalculateCosts: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.post('/api/costs/recalculate',
+            ...(fetchMiddlewares<RequestHandler>(CostsController)),
+            ...(fetchMiddlewares<RequestHandler>(CostsController.prototype.recalculateCosts)),
+
+            async function CostsController_recalculateCosts(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCostsController_recalculateCosts, request, response });
+
+                const controller = new CostsController();
+
+              await templateService.apiHandler({
+                methodName: 'recalculateCosts',
                 controller,
                 response,
                 next,

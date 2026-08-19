@@ -8,6 +8,82 @@ export interface TokenValues {
   readonly output: bigint;
 }
 
+export interface RawTokenCounters {
+  readonly input: bigint | null;
+  readonly cachedInput: bigint | null;
+  readonly output: bigint | null;
+}
+
+export interface NormalizedTokenCategories {
+  readonly input: bigint | null;
+  readonly cachedInput: bigint | null;
+  readonly uncachedInput: bigint | null;
+  readonly output: bigint | null;
+  readonly total: bigint | null;
+}
+
+export type SelectedEventKind =
+  "user_message" | "assistant_message" | "model_context" | "token_usage";
+export type MessageRole = "user" | "assistant";
+export type NormalizationMethod =
+  | "cumulative_difference"
+  | "reset_last_usage"
+  | "reset_incomplete"
+  | "standalone_delta"
+  | "legacy_aggregate";
+export type UsageAnomalyCode =
+  | "last_usage_mismatch"
+  | "counter_reset"
+  | "reset_without_last_usage"
+  | "negative_counter"
+  | "cached_exceeds_input"
+  | "missing_counter"
+  | "legacy_aggregate";
+
+export interface SelectedSessionEvent {
+  readonly eventId: string;
+  readonly sessionId: string;
+  readonly sourcePath: string;
+  readonly sourceIdentity: string;
+  readonly sourceRecordNumber: bigint;
+  readonly kind: SelectedEventKind;
+  readonly messageRole: MessageRole | null;
+  readonly eventTime: Date | null;
+  readonly messageContent: string | null;
+  readonly parserVersion: number;
+}
+
+export interface UsageObservation {
+  readonly observationId: string;
+  readonly sessionId: string;
+  readonly sourcePath: string;
+  readonly sourceIdentity: string;
+  readonly sourceRecordNumber: bigint;
+  readonly parserVersion: number;
+  readonly model: string;
+  readonly eventTime: Date | null;
+  readonly rawCumulative: RawTokenCounters | null;
+  readonly rawLast: RawTokenCounters | null;
+  readonly normalized: NormalizedTokenCategories;
+  readonly epoch: number;
+  readonly method: NormalizationMethod;
+  readonly complete: boolean;
+  readonly anomalyCodes: readonly UsageAnomalyCode[];
+  readonly legacy: boolean;
+}
+
+export interface SourceParseState {
+  readonly sourcePath: string;
+  readonly sessionId: string;
+  readonly sourceIdentity: string;
+  readonly parserVersion: number;
+  readonly activeModel: string;
+  readonly epoch: number;
+  readonly baseline: RawTokenCounters | null;
+  readonly nextRecordNumber: bigint;
+  readonly factRevision: bigint;
+}
+
 export interface SessionMetadataMutation {
   readonly sessionId: string;
   readonly sourceRoot: string;
@@ -85,6 +161,9 @@ export interface SourceChunkMutation {
   readonly observedModifiedAtMs: bigint;
   readonly parserVersion: number;
   readonly mutations: readonly SessionMutation[];
+  readonly events: readonly SelectedSessionEvent[];
+  readonly observations: readonly UsageObservation[];
+  readonly parseState: SourceParseState;
   readonly diagnostics: ParserDiagnostics;
   readonly runId?: string;
   readonly rebuild: boolean;
@@ -101,4 +180,8 @@ export function tokenValues(input: bigint, cachedInput: bigint, output: bigint):
     cachedInput: assertNonNegative(cachedInput, "cached input tokens"),
     output: assertNonNegative(output, "output tokens"),
   };
+}
+
+export function emptyRawTokenCounters(): RawTokenCounters {
+  return { input: null, cachedInput: null, output: null };
 }

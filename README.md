@@ -68,9 +68,10 @@ curl -X POST http://127.0.0.1:3000/api/linear/sync
 curl -X POST http://127.0.0.1:3000/api/sessions/<session-id>/relink
 ```
 
-Only stable session metadata, current titles, lifecycle timestamps, developer-turn counts,
-token totals, checkpoints, and sanitized diagnostics are persisted or returned. Prompt and
-response text, reasoning, tool arguments, and tool results are never copied into DuckDB.
+The internal POC persists stable session metadata, accounting facts, checkpoints, and selected
+explicit user/assistant message events. Message content remains local and is never returned by the
+session APIs. Reasoning, tool arguments/results, credentials, opaque raw records, and malformed
+payloads are never copied into DuckDB, logs, diagnostics, or APIs.
 
 ## Problem
 
@@ -117,8 +118,9 @@ link and all imported usage facts.
 Linear issue summaries are cached for one hour by default (`LINEAR_CACHE_TTL_MS`) and refreshed
 through startup or manual synchronization. Linked issues are refreshed by their stored identity,
 not by a later title candidate. The cache contains only minimal display metadata.
-Credentials, descriptions, comments, attachments, raw responses, and Codex transcript content
-are never persisted or exposed. The integration does not mutate Linear.
+Credentials, descriptions, comments, attachments, and raw Linear responses are never persisted or
+exposed. The Linear integration does not read selected Codex message-event content and does not
+mutate Linear.
 
 ## Core workflow
 

@@ -63,4 +63,12 @@ export class CodexCheckpointRepository {
     );
     return (reader.getRowObjects() as unknown as CodexImportCheckpointRow[]).map(mapCheckpointRow);
   }
+
+  public async delete(sourcePath: string): Promise<void> {
+    const statement = await this.connection.prepare(
+      "DELETE FROM codex_import_checkpoints WHERE source_path = $sourcePath",
+    );
+    statement.bind({ sourcePath });
+    await statement.run();
+  }
 }

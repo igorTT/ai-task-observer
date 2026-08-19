@@ -11,11 +11,20 @@ export interface SessionView {
   readonly startedAt?: string;
   readonly endedAt?: string;
   readonly developerTurns: string;
-  readonly inputTokens: string;
-  readonly cachedInputTokens: string;
-  readonly outputTokens: string;
-  readonly totalTokens: string;
+  readonly inputTokens: string | null;
+  readonly cachedInputTokens: string | null;
+  readonly uncachedInputTokens: string | null;
+  readonly outputTokens: string | null;
+  readonly totalTokens: string | null;
   readonly usageObserved: boolean;
+  readonly tokenCompleteness: {
+    readonly input: boolean;
+    readonly cachedInput: boolean;
+    readonly uncachedInput: boolean;
+    readonly output: boolean;
+    readonly total: boolean;
+  };
+  readonly usageAnomalies: readonly string[];
   readonly importState: string;
   readonly attribution: SessionAttributionResponse;
 }
@@ -68,11 +77,20 @@ export class SessionQueryService {
       ...(session.startedAt ? { startedAt: session.startedAt.toISOString() } : {}),
       ...(session.endedAt ? { endedAt: session.endedAt.toISOString() } : {}),
       developerTurns: jsonSafeCount(session.developerTurns),
-      inputTokens: jsonSafeCount(usage?.inputTokens ?? 0n),
-      cachedInputTokens: jsonSafeCount(usage?.cachedInputTokens ?? 0n),
-      outputTokens: jsonSafeCount(usage?.outputTokens ?? 0n),
-      totalTokens: jsonSafeCount(usage?.totalTokens ?? 0n),
+      inputTokens: jsonSafeNullable(usage?.inputTokens),
+      cachedInputTokens: jsonSafeNullable(usage?.cachedInputTokens),
+      uncachedInputTokens: jsonSafeNullable(usage?.uncachedInputTokens),
+      outputTokens: jsonSafeNullable(usage?.outputTokens),
+      totalTokens: jsonSafeNullable(usage?.totalTokens),
       usageObserved: usage?.usageObserved ?? false,
+      tokenCompleteness: usage?.completeness ?? {
+        input: false,
+        cachedInput: false,
+        uncachedInput: false,
+        output: false,
+        total: false,
+      },
+      usageAnomalies: usage?.anomalyCodes ?? [],
       importState: session.importState,
       attribution: attribution
         ? {
@@ -117,4 +135,8 @@ export class SessionQueryService {
       synchronizedAt: issue.syncedAt.toISOString(),
     };
   }
+}
+
+function jsonSafeNullable(value: bigint | null | undefined): string | null {
+  return value === null || value === undefined ? null : jsonSafeCount(value);
 }

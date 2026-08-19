@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 
 import { ConfigurationError } from "@/config/config.js";
 import type { AppDatabase } from "@/database/database.js";
@@ -33,5 +34,17 @@ describe("startServer", () => {
     ).rejects.toThrow("migration failed");
     expect(createIngestion).not.toHaveBeenCalled();
     expect(closeDatabase).toHaveBeenCalled();
+  });
+
+  test("rejects an invalid pricing catalog before opening the database or listener", () => {
+    const openDatabase = mock(() => Promise.reject(new Error("must not be called")));
+    const pricingPath = fileURLToPath(
+      new URL("./fixtures/pricing/invalid-overlap.json", import.meta.url),
+    );
+    const result = expect(
+      startServer({ PRICING_CATALOG_PATH: pricingPath, LOG_LEVEL: "silent" }, { openDatabase }),
+    ).rejects.toThrow(/price periods overlap/u);
+    expect(openDatabase).not.toHaveBeenCalled();
+    return result;
   });
 });

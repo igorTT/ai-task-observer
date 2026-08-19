@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { ConfigurationError, loadConfig } from "@/config/config.js";
 
@@ -24,7 +25,22 @@ describe("loadConfig", () => {
       codexRootRediscoveryMs: 60_000,
       linearCacheTtlMs: 60 * 60 * 1_000,
       linearMaxConcurrency: 4,
+      pricingCatalogPath: fileURLToPath(new URL("../../config/models.json", import.meta.url)),
+      costCalculationDebounceMs: 250,
     });
+  });
+
+  test("normalizes the optional pricing catalog path and calculation debounce", () => {
+    expect(
+      loadConfig({
+        PRICING_CATALOG_PATH: " ./fixtures/models.json ",
+        COST_CALCULATION_DEBOUNCE_MS: "500",
+      }),
+    ).toMatchObject({
+      pricingCatalogPath: resolve("./fixtures/models.json"),
+      costCalculationDebounceMs: 500,
+    });
+    expect(() => loadConfig({ PRICING_CATALOG_PATH: " " })).toThrow(/PRICING_CATALOG_PATH/u);
   });
 
   test("normalizes multiple Codex roots and ingestion limits", () => {

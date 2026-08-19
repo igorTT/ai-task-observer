@@ -1,0 +1,12 @@
+[mcp_servers.linear]
+url = "https://mcp.linear.app/mcp"
+enabled_tools = [
+  "create_issue",
+  "get_issue",
+  "list_issues",
+  "list_my_issues",
+  "update_issue",
+]
+default_tools_approval_mode = "writes"
+enabled = true
+required = false

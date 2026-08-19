@@ -11,7 +11,7 @@
     "start": "node dist/server.js",
     "generate": "tsoa spec-and-routes",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --max-concurrency 1",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/copy-migrations.mjs"
   },
   "dependencies": {

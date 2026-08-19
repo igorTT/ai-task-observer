@@ -19,12 +19,17 @@ import { IngestionCoordinator } from "@/modules/sessions/coordinator.js";
 import { CodexSourceImporter } from "@/modules/sessions/importer.js";
 import { SessionQueryService } from "@/modules/sessions/session-query-service.js";
 import { createLogger, createStartupLogger } from "@/observability/logger.js";
+import { CostCalculationService } from "@/modules/pricing/calculation-service.js";
+import { loadPricingCatalog } from "@/modules/pricing/catalog.js";
+import { CostCalculationCoordinator } from "@/modules/pricing/coordinator.js";
+import type { PricingCatalog } from "@/modules/pricing/domain.js";
 
 export interface RunningServer {
   readonly httpServer: Server;
   readonly database: AppDatabase;
   readonly ingestion: IngestionLifecycle;
   readonly attribution: AttributionLifecycle;
+  readonly costs: CostCalculationLifecycle;
   readonly close: () => Promise<void>;
 }
 
@@ -45,9 +50,18 @@ export interface IngestionLifecycle {
   readonly sessions: SessionQueryService;
 }
 
+export interface CostCalculationLifecycle {
+  readonly start: () => Promise<void>;
+  readonly close: () => Promise<void>;
+  readonly status: CostCalculationCoordinator["status"];
+  readonly recalculate: CostCalculationCoordinator["recalculate"];
+  readonly notifyCommitted: CostCalculationCoordinator["notifyCommitted"];
+}
+
 export interface ServerFactories {
   readonly openDatabase?: (path: string) => Promise<AppDatabase>;
   readonly migrate?: typeof applyMigrations;
+  readonly loadPricing?: (path: string) => Promise<PricingCatalog>;
   readonly createIngestion?: (
     config: Readonly<AppConfig>,
     database: AppDatabase,
@@ -59,6 +73,12 @@ export interface ServerFactories {
     database: AppDatabase,
     logger: Logger,
   ) => AttributionLifecycle;
+  readonly createCalculations?: (
+    config: Readonly<AppConfig>,
+    database: AppDatabase,
+    catalog: PricingCatalog,
+    logger: Logger,
+  ) => CostCalculationLifecycle;
 }
 
 export async function startServer(
@@ -66,30 +86,39 @@ export async function startServer(
   factories: ServerFactories = {},
 ): Promise<RunningServer> {
   const config = loadConfig(environment);
+  const catalog = await (factories.loadPricing ?? loadPricingCatalog)(config.pricingCatalogPath);
   const logger = createLogger(config);
   const database = await (factories.openDatabase ?? AppDatabase.open)(config.databasePath);
   let ingestion: IngestionLifecycle | undefined;
   let attribution: AttributionLifecycle | undefined;
+  let costs: CostCalculationLifecycle | undefined;
 
   try {
     await (factories.migrate ?? applyMigrations)(database, logger);
     attribution = (factories.createAttribution ?? createAttribution)(config, database, logger);
     const activeAttribution = attribution;
+    costs = (factories.createCalculations ?? createCalculations)(config, database, catalog, logger);
+    const activeCosts = costs;
     ingestion = (factories.createIngestion ?? createIngestion)(
       config,
       database,
       logger,
-      (sessionIds) => activeAttribution.notifySessions(sessionIds),
+      async (sessionIds) => {
+        await activeAttribution.notifySessions(sessionIds);
+        activeCosts.notifyCommitted();
+      },
     );
     await ingestion.start();
     const activeIngestion = ingestion;
     await activeAttribution.start();
+    await activeCosts.start();
     const app = createApp({
       logger,
       api: {
         ingestion: activeIngestion,
         sessions: activeIngestion.sessions,
         linear: activeAttribution,
+        costs: activeCosts,
       },
     });
     const httpServer = app.listen(config.port, config.host);
@@ -101,7 +130,11 @@ export async function startServer(
       closing ??= (async () => {
         httpServer.close();
         await once(httpServer, "close");
-        await Promise.all([activeIngestion.close(), activeAttribution.close()]);
+        await Promise.all([
+          activeIngestion.close(),
+          activeAttribution.close(),
+          activeCosts.close(),
+        ]);
         database.close();
         logger.info("backend stopped");
       })();
@@ -113,13 +146,27 @@ export async function startServer(
       database,
       ingestion: activeIngestion,
       attribution: activeAttribution,
+      costs: activeCosts,
       close,
     };
   } catch (error) {
-    await Promise.all([ingestion?.close(), attribution?.close()]);
+    await Promise.all([ingestion?.close(), attribution?.close(), costs?.close()]);
     database.close();
     throw error;
   }
+}
+
+function createCalculations(
+  config: Readonly<AppConfig>,
+  database: AppDatabase,
+  catalog: PricingCatalog,
+  logger: Logger,
+): CostCalculationLifecycle {
+  return new CostCalculationCoordinator({
+    service: new CostCalculationService({ database, catalog }),
+    logger,
+    debounceMs: config.costCalculationDebounceMs,
+  });
 }
 
 function createIngestion(

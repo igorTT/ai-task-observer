@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+
+const defaultPricingCatalogPath = fileURLToPath(
+  new URL("../../config/models.json", import.meta.url),
+);
 
 const logLevels = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
 
@@ -59,6 +64,13 @@ const environmentSchema = z.object({
     60 * 60 * 1_000,
   ),
   LINEAR_MAX_CONCURRENCY: positiveInteger("LINEAR_MAX_CONCURRENCY", 1, 20, 4),
+  PRICING_CATALOG_PATH: z
+    .string()
+    .trim()
+    .min(1, "PRICING_CATALOG_PATH must not be empty")
+    .transform((value) => resolve(value))
+    .default(defaultPricingCatalogPath),
+  COST_CALCULATION_DEBOUNCE_MS: positiveInteger("COST_CALCULATION_DEBOUNCE_MS", 10, 60_000, 250),
 });
 
 export interface AppConfig {
@@ -73,6 +85,8 @@ export interface AppConfig {
   readonly linearApiKey?: string;
   readonly linearCacheTtlMs: number;
   readonly linearMaxConcurrency: number;
+  readonly pricingCatalogPath: string;
+  readonly costCalculationDebounceMs: number;
 }
 
 export class ConfigurationError extends Error {
@@ -108,5 +122,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv): Readonly<AppConfig> 
     ...(parsed.data.LINEAR_API_KEY ? { linearApiKey: parsed.data.LINEAR_API_KEY } : {}),
     linearCacheTtlMs: parsed.data.LINEAR_CACHE_TTL_MS,
     linearMaxConcurrency: parsed.data.LINEAR_MAX_CONCURRENCY,
+    pricingCatalogPath: parsed.data.PRICING_CATALOG_PATH,
+    costCalculationDebounceMs: parsed.data.COST_CALCULATION_DEBOUNCE_MS,
   });
 }

@@ -9,6 +9,7 @@ import { AppDatabase } from "@/database/database.js";
 import { applyMigrations } from "@/database/migrate.js";
 import { MigrationRepository } from "@/database/repositories/migration-repository.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
+import { parseCodexRecords } from "@/modules/sessions/parser.js";
 
 test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it", async () => {
   const directory = await mkdtemp(join(tmpdir(), "duckdb-compatibility-"));
@@ -16,10 +17,29 @@ test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it",
   try {
     const database = await AppDatabase.open(path);
     await applyMigrations(database, pino({ enabled: false }));
-    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(3);
+    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(5);
     const ingestion = new CodexIngestionRepository(database);
     await ingestion.runs.create("compatibility-run", "startup");
     await ingestion.runs.setState("compatibility-run", "running");
+    const parsed = parseCodexRecords(
+      [
+        JSON.stringify({
+          type: "session_meta",
+          payload: { id: "compatibility-session" },
+        }),
+        JSON.stringify({ type: "event_msg", payload: { type: "user_message", message: "hello" } }),
+        JSON.stringify({
+          type: "token_usage",
+          payload: { input_tokens: 2, cached_input_tokens: 1, output_tokens: 3 },
+        }),
+      ],
+      {
+        sourceRoot: "/synthetic",
+        sourcePath: "/synthetic/compatibility.jsonl",
+        sourceIdentity: "1:1",
+      },
+    );
+    if (!parsed.parseState) throw new Error("fixture did not produce parse state");
     await ingestion.applySourceChunk({
       sourcePath: "/synthetic/compatibility.jsonl",
       sourceRoot: "/synthetic",
@@ -27,33 +47,26 @@ test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it",
       committedOffset: 10n,
       observedSize: 10n,
       observedModifiedAtMs: 1n,
-      parserVersion: 2,
+      parserVersion: 3,
       runId: "compatibility-run",
       rebuild: true,
       diagnostics: { unknownRecords: 0, malformedRecords: 0, warnings: [] },
-      mutations: [
-        {
-          metadata: {
-            sessionId: "compatibility-session",
-            sourceRoot: "/synthetic",
-            sourcePath: "/synthetic/compatibility.jsonl",
-          },
-          developerTurnDelta: 1n,
-          tokenSnapshot: { input: 2n, cachedInput: 1n, output: 3n },
-        },
-      ],
+      mutations: parsed.mutations,
+      events: parsed.events,
+      observations: parsed.observations,
+      parseState: parsed.parseState,
     });
     await ingestion.runs.setState("compatibility-run", "completed");
     database.close();
 
     const reopened = await AppDatabase.open(path);
-    expect(await new MigrationRepository(reopened.connection).findAll()).toHaveLength(3);
+    expect(await new MigrationRepository(reopened.connection).findAll()).toHaveLength(5);
     const reopenedIngestion = new CodexIngestionRepository(reopened);
     expect(await reopenedIngestion.sessions.findById("compatibility-session")).toMatchObject({
       developerTurns: 1n,
     });
     expect(await reopenedIngestion.usage.findBySessionId("compatibility-session")).toMatchObject({
-      totalTokens: 6n,
+      totalTokens: 5n,
     });
     expect(
       await reopenedIngestion.checkpoints.find("/synthetic/compatibility.jsonl"),

@@ -102,7 +102,9 @@ try {
     !sessionsResponse.ok ||
     sessions.total !== 1 ||
     sessions.items?.[0]?.sessionId !== "smoke-session" ||
-    sessions.items?.[0]?.totalTokens !== "15"
+    sessions.items?.[0]?.totalTokens !== "13" ||
+    sessions.items?.[0]?.uncachedInputTokens !== "8" ||
+    sessions.items?.[0]?.tokenCompleteness?.total !== true
   ) {
     throw new Error(`Unexpected session backfill response: ${JSON.stringify(sessions)}`);
   }
