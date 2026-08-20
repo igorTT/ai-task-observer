@@ -495,6 +495,314 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"IssueUsageIdentityResponse": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"identifier": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"identifier",
+					"title",
+					"url"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UsageMetricsResponse": {
+				"description": "Shared accounting metrics. Integer and fixed-decimal values are strings for JSON safety.",
+				"properties": {
+					"sessionCount": {
+						"type": "string",
+						"description": "Distinct sessions in this grouping. Daily values are non-additive across buckets."
+					},
+					"developerTurns": {
+						"type": "string"
+					},
+					"inputTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"cachedInputTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"outputTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"totalTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"estimatedCostUsd": {
+						"type": "string",
+						"nullable": true
+					},
+					"tokenComplete": {
+						"type": "boolean"
+					},
+					"costComplete": {
+						"type": "boolean"
+					},
+					"anomalyCodes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"pricingGapCodes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"sessionCount",
+					"developerTurns",
+					"inputTokens",
+					"cachedInputTokens",
+					"outputTokens",
+					"totalTokens",
+					"estimatedCostUsd",
+					"tokenComplete",
+					"costComplete",
+					"anomalyCodes",
+					"pricingGapCodes"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageSummaryResponse": {
+				"properties": {
+					"issue": {
+						"$ref": "#/components/schemas/IssueUsageIdentityResponse"
+					},
+					"metrics": {
+						"$ref": "#/components/schemas/UsageMetricsResponse"
+					}
+				},
+				"required": [
+					"issue",
+					"metrics"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageListResponse": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/IssueUsageSummaryResponse"
+						},
+						"type": "array"
+					},
+					"total": {
+						"type": "string"
+					},
+					"limit": {
+						"type": "number",
+						"format": "double"
+					},
+					"offset": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"items",
+					"total",
+					"limit",
+					"offset"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CostGenerationIdentityResponse": {
+				"properties": {
+					"generationId": {
+						"type": "string"
+					},
+					"sourceFactRevision": {
+						"type": "string"
+					},
+					"pricingCatalogVersion": {
+						"type": "string"
+					},
+					"pricingContentHash": {
+						"type": "string"
+					},
+					"calculatorVersion": {
+						"type": "string"
+					},
+					"completedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"generationId",
+					"sourceFactRevision",
+					"pricingCatalogVersion",
+					"pricingContentHash",
+					"calculatorVersion",
+					"completedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageModelResponse": {
+				"properties": {
+					"model": {
+						"type": "string",
+						"description": "Canonical model identity from the latest completed cost generation, or `unknown`."
+					},
+					"observedModels": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"metrics": {
+						"$ref": "#/components/schemas/UsageMetricsResponse"
+					}
+				},
+				"required": [
+					"model",
+					"observedModels",
+					"metrics"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageSessionResponse": {
+				"properties": {
+					"sessionId": {
+						"type": "string"
+					},
+					"title": {
+						"type": "string",
+						"nullable": true
+					},
+					"phase": {
+						"type": "string",
+						"nullable": true
+					},
+					"importState": {
+						"type": "string"
+					},
+					"lastError": {
+						"type": "string",
+						"nullable": true
+					},
+					"startedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"endedAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"metrics": {
+						"$ref": "#/components/schemas/UsageMetricsResponse"
+					},
+					"models": {
+						"items": {
+							"$ref": "#/components/schemas/IssueUsageModelResponse"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"sessionId",
+					"title",
+					"phase",
+					"importState",
+					"lastError",
+					"startedAt",
+					"endedAt",
+					"metrics",
+					"models"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageDailyResponse": {
+				"properties": {
+					"date": {
+						"type": "string",
+						"nullable": true,
+						"description": "UTC calendar date, or null for facts without a valid source timestamp."
+					},
+					"metrics": {
+						"$ref": "#/components/schemas/UsageMetricsResponse",
+						"description": "Metrics are additive except sessionCount, which is distinct and non-additive across days."
+					}
+				},
+				"required": [
+					"date",
+					"metrics"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"IssueUsageDetailResponse": {
+				"properties": {
+					"issue": {
+						"$ref": "#/components/schemas/IssueUsageIdentityResponse"
+					},
+					"metrics": {
+						"$ref": "#/components/schemas/UsageMetricsResponse"
+					},
+					"latestCompletedCostGeneration": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/CostGenerationIdentityResponse"
+							}
+						],
+						"nullable": true
+					},
+					"sessions": {
+						"items": {
+							"$ref": "#/components/schemas/IssueUsageSessionResponse"
+						},
+						"type": "array"
+					},
+					"models": {
+						"items": {
+							"$ref": "#/components/schemas/IssueUsageModelResponse"
+						},
+						"type": "array"
+					},
+					"daily": {
+						"items": {
+							"$ref": "#/components/schemas/IssueUsageDailyResponse"
+						},
+						"type": "array",
+						"description": "Known UTC dates sort ascending; the explicit unknown-time bucket sorts last."
+					}
+				},
+				"required": [
+					"issue",
+					"metrics",
+					"latestCompletedCostGeneration",
+					"sessions",
+					"models",
+					"daily"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"RootStatusResponse": {
 				"properties": {
 					"root": {
@@ -1105,6 +1413,102 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/api/issues/usage": {
+			"get": {
+				"operationId": "ListIssueUsage",
+				"responses": {
+					"200": {
+						"description": "Issue usage page",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/IssueUsageListResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Invalid pagination",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Lists usage-bearing issues in identifier-then-stable-ID order.",
+				"tags": [
+					"Issue usage"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"default": 50,
+							"format": "double",
+							"type": "number"
+						}
+					},
+					{
+						"in": "query",
+						"name": "offset",
+						"required": false,
+						"schema": {
+							"default": 0,
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/api/issues/{issueId}/usage": {
+			"get": {
+				"operationId": "GetIssueUsage",
+				"responses": {
+					"200": {
+						"description": "Issue usage detail",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/IssueUsageDetailResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Issue has no currently linked sessions",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Retrieves current committed-link accounting for one stable Linear issue ID.",
+				"tags": [
+					"Issue usage"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "issueId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/api/imports/status": {

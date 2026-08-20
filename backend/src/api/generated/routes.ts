@@ -10,6 +10,8 @@ import { SessionsController } from './../controllers/sessions.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { LinearController } from './../controllers/linear.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { IssueUsageController } from './../controllers/issue-usage.controller.js';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ImportsController } from './../controllers/imports.controller.js';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { CostsController } from './../controllers/costs.controller.js';
@@ -179,6 +181,116 @@ const models: TsoaRoute.Models = {
             "runId": {"dataType":"string","required":true},
             "state": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["queued"]},{"dataType":"enum","enums":["running"]}],"required":true},
             "coalesced": {"dataType":"boolean","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageIdentityResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "id": {"dataType":"string","required":true},
+            "identifier": {"dataType":"string","required":true},
+            "title": {"dataType":"string","required":true},
+            "url": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "UsageMetricsResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "sessionCount": {"dataType":"string","required":true},
+            "developerTurns": {"dataType":"string","required":true},
+            "inputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "cachedInputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "outputTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "totalTokens": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "estimatedCostUsd": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "tokenComplete": {"dataType":"boolean","required":true},
+            "costComplete": {"dataType":"boolean","required":true},
+            "anomalyCodes": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "pricingGapCodes": {"dataType":"array","array":{"dataType":"string"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageSummaryResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "issue": {"ref":"IssueUsageIdentityResponse","required":true},
+            "metrics": {"ref":"UsageMetricsResponse","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageListResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "items": {"dataType":"array","array":{"dataType":"refObject","ref":"IssueUsageSummaryResponse"},"required":true},
+            "total": {"dataType":"string","required":true},
+            "limit": {"dataType":"double","required":true},
+            "offset": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CostGenerationIdentityResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "generationId": {"dataType":"string","required":true},
+            "sourceFactRevision": {"dataType":"string","required":true},
+            "pricingCatalogVersion": {"dataType":"string","required":true},
+            "pricingContentHash": {"dataType":"string","required":true},
+            "calculatorVersion": {"dataType":"string","required":true},
+            "completedAt": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageModelResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "model": {"dataType":"string","required":true},
+            "observedModels": {"dataType":"array","array":{"dataType":"string"},"required":true},
+            "metrics": {"ref":"UsageMetricsResponse","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageSessionResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "sessionId": {"dataType":"string","required":true},
+            "title": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "phase": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "importState": {"dataType":"string","required":true},
+            "lastError": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "startedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "endedAt": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "metrics": {"ref":"UsageMetricsResponse","required":true},
+            "models": {"dataType":"array","array":{"dataType":"refObject","ref":"IssueUsageModelResponse"},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageDailyResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "date": {"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},
+            "metrics": {"ref":"UsageMetricsResponse","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "IssueUsageDetailResponse": {
+        "dataType": "refObject",
+        "properties": {
+            "issue": {"ref":"IssueUsageIdentityResponse","required":true},
+            "metrics": {"ref":"UsageMetricsResponse","required":true},
+            "latestCompletedCostGeneration": {"dataType":"union","subSchemas":[{"ref":"CostGenerationIdentityResponse"},{"dataType":"enum","enums":[null]}],"required":true},
+            "sessions": {"dataType":"array","array":{"dataType":"refObject","ref":"IssueUsageSessionResponse"},"required":true},
+            "models": {"dataType":"array","array":{"dataType":"refObject","ref":"IssueUsageModelResponse"},"required":true},
+            "daily": {"dataType":"array","array":{"dataType":"refObject","ref":"IssueUsageDailyResponse"},"required":true},
         },
         "additionalProperties": false,
     },
@@ -503,6 +615,67 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 202,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsIssueUsageController_listIssueUsage: Record<string, TsoaRoute.ParameterSchema> = {
+                limit: {"default":50,"in":"query","name":"limit","dataType":"double"},
+                offset: {"default":0,"in":"query","name":"offset","dataType":"double"},
+        };
+        app.get('/api/issues/usage',
+            ...(fetchMiddlewares<RequestHandler>(IssueUsageController)),
+            ...(fetchMiddlewares<RequestHandler>(IssueUsageController.prototype.listIssueUsage)),
+
+            async function IssueUsageController_listIssueUsage(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsIssueUsageController_listIssueUsage, request, response });
+
+                const controller = new IssueUsageController();
+
+              await templateService.apiHandler({
+                methodName: 'listIssueUsage',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsIssueUsageController_getIssueUsage: Record<string, TsoaRoute.ParameterSchema> = {
+                issueId: {"in":"path","name":"issueId","required":true,"dataType":"string"},
+        };
+        app.get('/api/issues/:issueId/usage',
+            ...(fetchMiddlewares<RequestHandler>(IssueUsageController)),
+            ...(fetchMiddlewares<RequestHandler>(IssueUsageController.prototype.getIssueUsage)),
+
+            async function IssueUsageController_getIssueUsage(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsIssueUsageController_getIssueUsage, request, response });
+
+                const controller = new IssueUsageController();
+
+              await templateService.apiHandler({
+                methodName: 'getIssueUsage',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 200,
               });
             } catch (err) {
                 return next(err);

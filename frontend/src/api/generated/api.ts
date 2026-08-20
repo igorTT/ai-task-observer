@@ -25,6 +25,18 @@ const injectedRtkApi = api.injectEndpoints({
     sync: build.mutation<SyncApiResponse, SyncApiArg>({
       query: () => ({ url: `/api/linear/sync`, method: "POST" }),
     }),
+    listIssueUsage: build.query<ListIssueUsageApiResponse, ListIssueUsageApiArg>({
+      query: (queryArg) => ({
+        url: `/api/issues/usage`,
+        params: {
+          limit: queryArg.limit,
+          offset: queryArg.offset,
+        },
+      }),
+    }),
+    getIssueUsage: build.query<GetIssueUsageApiResponse, GetIssueUsageApiArg>({
+      query: (queryArg) => ({ url: `/api/issues/${queryArg.issueId}/usage` }),
+    }),
     importStatus: build.query<ImportStatusApiResponse, ImportStatusApiArg>({
       query: () => ({ url: `/api/imports/status` }),
     }),
@@ -64,6 +76,16 @@ export type StatusApiResponse = /** status 200 Linear integration status */ Line
 export type StatusApiArg = void;
 export type SyncApiResponse = /** status 202 Synchronization accepted */ LinearSyncResponse;
 export type SyncApiArg = void;
+export type ListIssueUsageApiResponse = /** status 200 Issue usage page */ IssueUsageListResponse;
+export type ListIssueUsageApiArg = {
+  limit?: number;
+  offset?: number;
+};
+export type GetIssueUsageApiResponse =
+  /** status 200 Issue usage detail */ IssueUsageDetailResponse;
+export type GetIssueUsageApiArg = {
+  issueId: string;
+};
 export type ImportStatusApiResponse = /** status 200 Status */ ImportStatusResponse;
 export type ImportStatusApiArg = void;
 export type RescanApiResponse = /** status 202 Accepted */ RescanResponse;
@@ -194,6 +216,76 @@ export type LinearSyncResponse = {
   state: "queued" | "running";
   coalesced: boolean;
 };
+export type IssueUsageIdentityResponse = {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+};
+export type UsageMetricsResponse = {
+  /** Distinct sessions in this grouping. Daily values are non-additive across buckets. */
+  sessionCount: string;
+  developerTurns: string;
+  inputTokens: string | null;
+  cachedInputTokens: string | null;
+  outputTokens: string | null;
+  totalTokens: string | null;
+  estimatedCostUsd: string | null;
+  tokenComplete: boolean;
+  costComplete: boolean;
+  anomalyCodes: string[];
+  pricingGapCodes: string[];
+};
+export type IssueUsageSummaryResponse = {
+  issue: IssueUsageIdentityResponse;
+  metrics: UsageMetricsResponse;
+};
+export type IssueUsageListResponse = {
+  items: IssueUsageSummaryResponse[];
+  total: string;
+  limit: number;
+  offset: number;
+};
+export type CostGenerationIdentityResponse = {
+  generationId: string;
+  sourceFactRevision: string;
+  pricingCatalogVersion: string;
+  pricingContentHash: string;
+  calculatorVersion: string;
+  completedAt: string;
+};
+export type IssueUsageModelResponse = {
+  /** Canonical model identity from the latest completed cost generation, or `unknown`. */
+  model: string;
+  observedModels: string[];
+  metrics: UsageMetricsResponse;
+};
+export type IssueUsageSessionResponse = {
+  sessionId: string;
+  title: string | null;
+  phase: string | null;
+  importState: string;
+  lastError: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  metrics: UsageMetricsResponse;
+  models: IssueUsageModelResponse[];
+};
+export type IssueUsageDailyResponse = {
+  /** UTC calendar date, or null for facts without a valid source timestamp. */
+  date: string | null;
+  /** Metrics are additive except sessionCount, which is distinct and non-additive across days. */
+  metrics: UsageMetricsResponse;
+};
+export type IssueUsageDetailResponse = {
+  issue: IssueUsageIdentityResponse;
+  metrics: UsageMetricsResponse;
+  latestCompletedCostGeneration: CostGenerationIdentityResponse | null;
+  sessions: IssueUsageSessionResponse[];
+  models: IssueUsageModelResponse[];
+  /** Known UTC dates sort ascending; the explicit unknown-time bucket sorts last. */
+  daily: IssueUsageDailyResponse[];
+};
 export type RootStatusResponse = {
   root: string;
   available: boolean;
@@ -282,6 +374,8 @@ export const {
   useRelinkMutation,
   useStatusQuery,
   useSyncMutation,
+  useListIssueUsageQuery,
+  useGetIssueUsageQuery,
   useImportStatusQuery,
   useRescanMutation,
   useCostCalculationStatusQuery,

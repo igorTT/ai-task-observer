@@ -23,6 +23,9 @@ import { CostCalculationService } from "@/modules/pricing/calculation-service.js
 import { loadPricingCatalog } from "@/modules/pricing/catalog.js";
 import { CostCalculationCoordinator } from "@/modules/pricing/coordinator.js";
 import type { PricingCatalog } from "@/modules/pricing/domain.js";
+import { CostCalculationRepository } from "@/database/repositories/cost-calculation-repository.js";
+import { IssueUsageRepository } from "@/database/repositories/issue-usage-repository.js";
+import { IssueUsageQueryService } from "@/modules/issues/issue-usage-query-service.js";
 
 export interface RunningServer {
   readonly httpServer: Server;
@@ -119,6 +122,10 @@ export async function startServer(
         sessions: activeIngestion.sessions,
         linear: activeAttribution,
         costs: activeCosts,
+        issueUsage: new IssueUsageQueryService(
+          new IssueUsageRepository(database.connection),
+          new CostCalculationRepository(database.connection),
+        ),
       },
     });
     const httpServer = app.listen(config.port, config.host);

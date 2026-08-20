@@ -84,31 +84,47 @@ The system SHALL count one developer turn for each explicit user-authored messag
 
 ### Requirement: Token-usage normalization
 
-The system SHALL persist non-negative input, cached-input, and output token totals reported by supported Codex records and SHALL avoid double-counting cumulative source values.
+The system SHALL persist supported source token observations and normalized input, cached-input,
+uncached-input, output, and total-token facts without double-counting cumulative values. Input SHALL
+include cached input, and total tokens SHALL equal input plus output. Missing or invalid categories
+SHALL be represented as unknown and SHALL make the affected aggregate incomplete.
 
 #### Scenario: Supported token usage is present
 
 - **WHEN** a session contains supported token-usage records
-- **THEN** the system SHALL persist normalized input, cached-input, output, and computed total-token values for the session
+- **THEN** the system SHALL persist their raw counters and normalized deltas and SHALL derive session totals from the normalized deltas
 
 #### Scenario: Cumulative token snapshot repeats
 
-- **WHEN** a source repeats or supersedes a cumulative token snapshot
-- **THEN** the system SHALL use the authoritative cumulative values and SHALL not add the repeated totals together
+- **WHEN** a source repeats a cumulative token snapshot
+- **THEN** the repeated observation SHALL contribute a zero delta and SHALL NOT increase session totals
 
 #### Scenario: Token usage is absent
 
 - **WHEN** a valid session has no supported token-usage records
-- **THEN** the session SHALL remain importable with zero known token totals and an explicit indication that no usage was observed
+- **THEN** the session SHALL remain importable with unknown token totals and an explicit indication that no usage was observed
+
+#### Scenario: Token category is invalid
+
+- **WHEN** a supported record contains a negative counter or cached input greater than input
+- **THEN** the system SHALL preserve the source value for audit, mark affected categories unknown, and report incomplete accounting without silently correcting the value
 
 ### Requirement: Privacy-safe persistence
 
-The system SHALL persist only metadata and normalized usage facts required by the product and SHALL not persist or expose full prompt, response, reasoning, tool-argument, or tool-result content.
+The system SHALL persist only selected structured events, metadata, and normalized usage facts
+required by the internal POC. It MAY persist user and assistant message content, but SHALL NOT
+persist or expose reasoning content, tool arguments, tool results, credentials, opaque full source
+records, or malformed-record payloads. Diagnostic logs and status responses SHALL remain sanitized.
+
+#### Scenario: Permitted message content is parsed
+
+- **WHEN** a supported record contains an explicit user message or assistant response
+- **THEN** the system MAY persist that message's role, content, source identity, and event time as a selected structured event
 
 #### Scenario: Content-bearing records are parsed
 
-- **WHEN** a supported record contains message text, reasoning content, tool arguments, or tool results
-- **THEN** the parser SHALL extract only permitted metadata and counters and SHALL not write that content to DuckDB
+- **WHEN** a supported record contains reasoning content, tool arguments, tool results, credentials, or an opaque payload
+- **THEN** the parser SHALL omit that content from DuckDB, logs, diagnostics, and APIs
 
 #### Scenario: Import failure is logged
 
@@ -169,12 +185,14 @@ The system SHALL defer an incomplete trailing JSONL record until the source cont
 
 ### Requirement: Source rewrite recovery
 
-The system SHALL detect when a previously checkpointed source was truncated, replaced, or requires a newer parser version and SHALL rebuild the affected session facts from the current source.
+The system SHALL detect when a previously checkpointed source was truncated, replaced, or requires
+a newer parser version and SHALL rebuild the affected session metadata, selected events, usage
+observations, derived totals, and developer turns from the current source.
 
 #### Scenario: Source is truncated or replaced
 
 - **WHEN** the current source identity or size is incompatible with its committed checkpoint
-- **THEN** the system SHALL perform a full re-import of that source and atomically replace the affected derived session facts
+- **THEN** the system SHALL perform a full re-import and atomically replace all derived session records owned by that source
 
 #### Scenario: Parser version changes
 
@@ -184,7 +202,7 @@ The system SHALL detect when a previously checkpointed source was truncated, rep
 #### Scenario: Rebuild fails
 
 - **WHEN** a full rebuild cannot complete
-- **THEN** the previously committed session facts SHALL remain available and the import status SHALL report the failed rebuild
+- **THEN** the previously committed selected events, usage facts, session totals, and checkpoint SHALL remain available and import status SHALL report the failed rebuild
 
 ### Requirement: Unknown and malformed record tolerance
 
