@@ -10,10 +10,12 @@
     "dev": "vite",
     "generate": "rtk-query-codegen-openapi openapi-config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test __tests__",
+    "test:e2e": "playwright test",
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.23",
     "@reduxjs/toolkit": "^2.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -22,11 +24,11 @@
     "react-dom": "^19.2.8",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.2",
-    "tailwind-merge": "^3.6.0",
-    "zustand": "^5.0.14"
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.11.1",
+    "@playwright/test": "^1.62.1",
     "@rtk-query/codegen-openapi": "2.2.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.0",

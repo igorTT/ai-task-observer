@@ -7,4 +7,5 @@ openspec
 backend/generated
 backend/src/api/generated
 frontend/src/api/generated
+frontend/test-results
 package-lock.json

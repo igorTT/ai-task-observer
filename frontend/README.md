@@ -1,9 +1,9 @@
 # Frontend
 
 The frontend is the local web interface for exploring Codex usage attributed to Linear issues.
-
-The Vite application foundation is initialized with a routable React shell, Tailwind CSS,
-shadcn/ui conventions, RTK Query, and a shell-only Zustand display preference.
+It provides a desktop-only React dashboard for viewport widths of at least 1024 CSS pixels,
+Tailwind CSS, shadcn/ui conventions, and RTK Query.
+Narrower viewport presentations are outside the supported product contract.
 
 ## Commands
 
@@ -15,112 +15,84 @@ npm run generate -w frontend
 npm run typecheck -w frontend
 npm run test -w frontend
 npm run build -w frontend
+npm run test:e2e -w frontend
 ```
 
 Use root `npm run generate:api` after backend controller changes; it refreshes the backend
-contract before the frontend client. The Vite development server proxies `/api` to the
-backend at `http://127.0.0.1:3000`.
+contract before the frontend client. The Vite development server proxies `/api` to the backend at
+`http://127.0.0.1:3000`.
 
-Frontend-authored code uses `@/*` for imports outside the current directory, where `@/`
-resolves only to `frontend/src`. Same-directory `./` imports remain valid. TypeScript, Vite,
-and Bun tests share this application-local mapping.
+Frontend-authored code uses `@/*` for imports outside the current directory, where `@/` resolves
+only to `frontend/src`. Same-directory `./` imports remain valid. TypeScript, Vite, and Bun tests
+share this application-local mapping.
 
 ## Responsibilities
 
-- Display issue-level usage summaries
-- Display the Codex sessions linked to each Linear issue
-- Show unlinked or invalid sessions
-- Break usage down by date and optional workflow phase
-- Display token counts, developer turns, and estimated cost
-- Surface session-import and Linear-synchronization status
-- Provide local display and filtering preferences
+- Display issue-level usage summaries and detailed session, model, and UTC-daily breakdowns
+- Show unlinked, invalid, or changed-candidate sessions and provide explicit relinking
+- Display token counts, developer turns, estimated cost, completeness, and sanitized warnings
+- Surface session-import, Linear-synchronization, and cost-calculation status and actions
 
 The frontend does not read Codex files, call Linear directly, calculate pricing, or access DuckDB.
 
 ## Stack
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- React Router
+- React and TypeScript
+- Vite and Tailwind CSS
+- shadcn/ui and React Router
 - RTK Query
-- Zustand
 - OpenAPI code generation
-- Bun test
-- React Testing Library and happy-dom
+- Bun test, React Testing Library, and happy-dom
 - Playwright for end-to-end coverage
 
-## State ownership
+## Routes and state ownership
 
-RTK Query owns data received from the backend:
+The stable routes are `/issues`, `/issues/:issueId`, and `/sessions`; `/` redirects to the issue
+overview. Issue identity and one-based list pagination belong to React Router. Invalid pagination
+normalizes to the first page, and browser back or forward restores the URL-owned page.
 
-- Issues
-- Sessions
-- Usage summaries
-- Import status
-- Linear synchronization status
+RTK Query owns issues, sessions, usage summaries, import state, Linear status, cost status, and
+their request lifecycles. The authored API enhancement adds focused cache tags while the generated
+client remains untouched. Relink-dialog state stays local to the initiating session record.
 
-Zustand owns local interface state:
+## Metric semantics
 
-- Sidebar and dialog state
-- Visible table columns
-- Local display preferences
-- Theme
-- Filters that are not represented in the URL
-
-Server data must not be copied into Zustand. Shareable navigation state, such as the selected issue or date range, should be represented in the URL where practical.
+Counts remain decimal strings through formatting so values above JavaScript's safe integer range
+stay exact. `Unavailable` is distinct from zero. Cached input is a labeled subset of input and is
+not added to backend totals again. Costs are API-supplied estimates, and daily distinct-session
+counts are non-additive across dates. Unknown models and null UTC dates remain explicit buckets.
 
 ## API client
 
-The backend-generated OpenAPI document is the API contract. RTK Query endpoints and hooks will be generated from that document.
+The backend-generated OpenAPI document is the API contract. RTK Query endpoints and hooks are
+generated from that document. Generated API code must not be edited manually; verification
+regenerates it and fails when committed output is stale.
 
-Generated API code must not be edited manually. CI should regenerate it and fail when committed generated output is stale.
-
-## Expected source layout
+## Source layout
 
 ```text
 frontend/
 ├── src/
 │   ├── app/             Application shell, providers, and routing
-│   ├── components/      Shared UI components
-│   ├── features/        Issue, session, usage, and settings features
-│   ├── api/             Generated RTK Query client and API setup
-│   ├── stores/          Zustand stores
-│   └── lib/             Frontend utilities
-├── __tests__/
-│   ├── app/             Tests mirroring src/app
-│   ├── components/      Tests mirroring src/components
-│   ├── features/        Tests mirroring src/features
-│   ├── api/             Tests mirroring src/api
-│   ├── stores/          Tests mirroring src/stores
-│   ├── lib/             Tests mirroring src/lib
-│   └── setup.ts         Shared DOM and test setup
-├── e2e/                 Playwright tests
+│   ├── components/ui/   Minimal shared presentation primitives
+│   ├── features/        Issue, session, and operational features
+│   ├── api/             Generated client and authored endpoint enhancement
+│   └── lib/             Exact formatters and request helpers
+├── __tests__/           Tests mirroring the src tree
+├── e2e/                 Deterministic intercepted Playwright flows
 ├── public/
 └── README.md
 ```
 
-The `__tests__/` tree mirrors the `src/` tree so that each test has a predictable location without mixing production and test files. Feature-specific components should remain within their feature until they are genuinely reused.
+Feature-specific components remain within their feature until they are genuinely reused.
 
 ## Testing
 
-- Pure utilities and local stores: Bun test
-- React components: Bun test, React Testing Library, and happy-dom
-- Generated API integration behavior: focused integration tests
-- Critical user flows: Playwright
+- Exact formatters, URL helpers, errors, and cache invalidation: Bun test
+- React shell, persistent navigation, and fixed-density expectations: React Testing Library and happy-dom
+- Critical cross-route flows: Playwright with deterministic API interception
+- Desktop-only browser verification: Playwright Chromium at the 1024 CSS-pixel support boundary
 
-Initial end-to-end flows should cover:
-
-1. Viewing the issue usage list
-2. Opening an issue and inspecting its sessions
-3. Finding an unlinked session
-4. Observing import or Linear synchronization failures
-
-## Foundation behavior
-
-The initial route renders without a backend, imported Codex sessions, or Linear credentials.
-Redux contains only the generated RTK Query reducer and middleware. Zustand owns the compact
-shell preference, while navigation remains in React Router. Tests run through Bun with
-happy-dom and React Testing Library.
+The browser suite covers overview-to-detail navigation, explicit relinking, operational failure
+and retry, active polling termination, URL normalization, back navigation, large exact metrics,
+and page-level overflow at the minimum supported width.

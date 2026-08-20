@@ -1,39 +1,59 @@
 import { Activity } from "lucide-react";
-import { Outlet } from "react-router-dom";
-
-import { Button } from "@/components/ui/button";
-import { useShellStore } from "@/stores/shell-store";
+import { NavLink, Outlet, useRouteError } from "react-router-dom";
+import { OperationsPanel } from "@/features/operations/operations-panel";
 
 export function ApplicationShell() {
-  const compactMode = useShellStore((state) => state.compactMode);
-  const toggleCompactMode = useShellStore((state) => state.toggleCompactMode);
   return (
-    <div className={compactMode ? "mx-auto max-w-4xl p-4" : "mx-auto max-w-6xl p-8"}>
-      <header className="flex items-center justify-between border-b pb-4">
-        <div className="flex items-center gap-3">
+    <div className="app">
+      <header className="app-header">
+        <NavLink to="/issues" className="brand">
           <Activity aria-hidden="true" className="text-primary" />
-          <span className="font-semibold">AI Task Observer</span>
+          <span>
+            <strong>AI Task Observer</strong>
+            <small>Local usage accounting</small>
+          </span>
+        </NavLink>
+        <nav aria-label="Primary navigation" className="primary-nav">
+          <NavLink to="/issues">Issues</NavLink>
+          <NavLink to="/sessions">Sessions</NavLink>
+        </nav>
+        <div className="header-actions">
+          <OperationsPanel />
         </div>
-        <Button variant="outline" size="sm" onClick={toggleCompactMode}>
-          {compactMode ? "Comfortable view" : "Compact view"}
-        </Button>
       </header>
-      <main className="py-12">
+      <main id="main-content" className="page">
         <Outlet />
       </main>
     </div>
   );
 }
 
-export function HomeRoute() {
+export function RouteErrorBoundary() {
+  const error = useRouteError();
   return (
-    <section className="max-w-2xl space-y-4">
-      <p className="text-sm font-medium uppercase tracking-widest text-primary">Foundation ready</p>
-      <h1 className="text-4xl font-bold tracking-tight">Understand the work behind every issue.</h1>
-      <p className="text-lg text-slate-600">
-        Codex session usage will appear here after the ingestion and Linear attribution capabilities
-        are added.
+    <section>
+      <p className="eyebrow">Dashboard error</p>
+      <h1>Something went wrong</h1>
+      <p className="mt-3 text-slate-600">
+        The route could not be displayed. Return to the issue overview and try again.
       </p>
+      <a className="safe-link mt-4" href="/issues">
+        Go to issue usage
+      </a>
+      {import.meta.env.DEV && error instanceof Error && (
+        <pre className="mt-4 overflow-auto rounded bg-slate-100 p-4 text-xs">{error.message}</pre>
+      )}
+    </section>
+  );
+}
+export function NotFoundPage() {
+  return (
+    <section>
+      <p className="eyebrow">Not found</p>
+      <h1>That dashboard page does not exist</h1>
+      <a className="safe-link mt-4" href="/issues">
+        Go to issue usage
+      </a>
     </section>
   );
 }

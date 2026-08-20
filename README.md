@@ -38,6 +38,20 @@ npm run build:backend
 npm run verify
 ```
 
+## Usage dashboard
+
+The persistent dashboard shell exposes `/issues`, `/issues/:issueId`, and `/sessions`; `/`
+redirects to the issue overview. Issue and session pagination is URL-owned through the one-based
+`page` query parameter, API state remains in RTK Query, and relink-dialog state stays local to the
+initiating session record. The operations control reports import, Linear, and cost status and
+offers the existing explicit rescan, sync, and recalculation actions.
+
+Counts remain decimal strings through formatting so values above JavaScript's safe integer range
+stay exact. `Unavailable` is distinct from zero, cached input is included within input rather than
+added to total tokens again, costs are estimates, and daily distinct-session counts are
+non-additive. Run `npm run test -w frontend` for component tests and
+`npm run test:e2e -w frontend` for the intercepted Playwright flows.
+
 `npm run generate:api` always generates the tsoa OpenAPI document and Express routes before
 generating the frontend RTK Query endpoints and hooks. The three generated locations are
 committed and must not be edited manually.
@@ -207,7 +221,6 @@ The backend is the only process that owns the writable DuckDB database. The fron
 - Tailwind CSS
 - shadcn/ui
 - RTK Query for remote/server state
-- Zustand for local UI state
 - OpenAPI-generated RTK Query client
 - Bun test as the test runner
 

@@ -18,4 +18,91 @@
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
   }
+
+  h1 {
+    @apply text-4xl font-bold tracking-tight;
+  }
+
+  th {
+    @apply border-b bg-slate-50 px-3 py-3 font-semibold;
+  }
+
+  td {
+    @apply border-b px-3 py-4 align-top;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2;
+  }
+}
+
+@layer components {
+  .app {
+    min-width: 1024px;
+  }
+  .app-header {
+    @apply sticky top-0 z-30 mx-auto flex max-w-7xl items-center gap-4 border-b bg-background/95 px-8 py-3 backdrop-blur;
+  }
+  .brand {
+    @apply mr-auto flex items-center gap-3 rounded;
+  }
+  .brand span {
+    @apply flex flex-col;
+  }
+  .brand small {
+    @apply text-xs font-normal text-slate-500;
+  }
+  .primary-nav {
+    @apply flex items-center gap-2;
+  }
+  .primary-nav a {
+    @apply rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white;
+  }
+  .primary-nav a.active {
+    @apply bg-white text-primary shadow-sm;
+  }
+  .header-actions {
+    @apply flex items-center gap-2;
+  }
+  .page {
+    @apply mx-auto max-w-7xl px-8 py-12;
+  }
+  .eyebrow {
+    @apply mb-1 text-xs font-semibold uppercase tracking-widest text-primary;
+  }
+  .safe-link {
+    @apply inline-flex items-center gap-1 rounded text-sm font-medium text-primary hover:underline;
+  }
+  .button-link {
+    @apply inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground;
+  }
+  .metric-grid {
+    @apply grid grid-cols-7 gap-3;
+  }
+  .metric {
+    @apply rounded-lg bg-slate-50 p-3;
+  }
+  .metric dt,
+  .record-grid dt {
+    @apply text-xs font-medium text-slate-500;
+  }
+  .metric dd {
+    @apply mt-1 break-all text-base font-semibold tabular-nums;
+  }
+  .record-grid {
+    @apply grid grid-cols-4 gap-4;
+  }
+  .record-grid dd {
+    @apply mt-1 break-words text-sm;
+  }
+  .mono {
+    @apply mt-1 break-all font-mono text-xs text-slate-500;
+  }
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+  .operations-panel {
+    @apply fixed right-8 top-20 z-30 max-h-[calc(100vh-6rem)] w-[28rem] overflow-y-auto rounded-xl border bg-background p-5 shadow-2xl;
+  }
 }
