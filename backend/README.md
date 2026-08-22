@@ -36,6 +36,7 @@ contains Node.js-resolvable relative paths.
 | `DATABASE_PATH`             | `data/ai-task-observer.duckdb` | Writable DuckDB file                    |
 | `LOG_LEVEL`                 | `info`                         | Pino level                              |
 | `CODEX_SESSION_ROOTS`       | `~/.codex/sessions`            | Comma-separated read-only session roots |
+| `CODEX_SESSION_INDEX_PATH`  | `~/.codex/session_index.jsonl` | Read-only current-title index           |
 | `CODEX_READ_CHUNK_BYTES`    | `1048576`                      | Bounded source read size (1 KiB–16 MiB) |
 | `CODEX_WATCH_DEBOUNCE_MS`   | `1000`                         | Duplicate filesystem-event debounce     |
 | `CODEX_ROOT_REDISCOVERY_MS` | `60000`                        | Unavailable-root rediscovery interval   |
@@ -48,6 +49,14 @@ independently: missing, unreadable, and non-directory roots appear in import sta
 making `/api/health` unhealthy. Check the path and read permissions when a root is unavailable;
 the backend backfills it automatically when it later becomes readable.
 
+The session index is an independent, optional read-only input. It is read after rollout startup
+discovery and during explicit rescans, and a debounced watcher observes renames while the backend
+is running. Missing or unreadable index input does not fail rollout ingestion. Valid records use
+only `id`, optional `thread_name`, and `updated_at`; malformed records and incomplete trailing
+lines are ignored with sanitized diagnostics. A valid empty `thread_name` clears a stored title,
+while an absent or invalid entry preserves the last known title. Raw index rows, opaque fields,
+transcripts, reasoning, tool data, and credentials are never persisted or exposed.
+
 Leaving `LINEAR_API_KEY` unset is supported: health, ingestion, and session APIs remain
 available, parsed issue candidates report `unconfigured`, and the backend makes no Linear
 requests. The key is read only from process configuration and is never persisted, logged, or
@@ -56,9 +65,11 @@ returned by the API.
 ## Session ingestion operations
 
 Startup performs recursive historical discovery before Chokidar continues incremental
-watching. Appends resume at the last committed complete-record byte offset. Incomplete trailing
-JSON is deferred until its terminating newline arrives. Truncation, replacement, and parser
-version changes trigger an atomic rebuild that preserves the last valid snapshot on failure.
+watching, then reconciles current titles from the session index. Appends resume at the last
+committed complete-record byte offset. Incomplete trailing JSON is deferred until its terminating
+newline arrives. Truncation, replacement, and parser version changes trigger an atomic rebuild
+that preserves the last valid snapshot on failure. Index title changes do not rewrite usage facts
+or session identity and are sent through the existing Linear attribution notification path.
 Available roots are not periodically crawled; recursive discovery runs again only for an
 explicit rescan, while the retry timer checks roots currently marked unavailable.
 
@@ -66,6 +77,10 @@ explicit rescan, while the retry timer checks roots currently marked unavailable
 - `POST /api/imports/rescan` starts or coalesces an explicit backfill.
 - `GET /api/sessions?limit=50&offset=0` lists sessions deterministically.
 - `GET /api/sessions/{sessionId}` returns one normalized session or a documented 404.
+
+Rollout parser version bumps cannot recover titles when rollout records contain no title metadata;
+the session index is the authoritative current-title source. The `link-current-codex-session`
+workflow depends on this capability before it can reliably inspect current titles.
 
 ## Linear attribution
 
@@ -290,13 +305,18 @@ The production container should:
 - Use a Debian-based Node.js image suitable for DuckDB native bindings
 - Run as a non-root user
 - Mount the Codex sessions directory read-only
+- Mount `session_index.jsonl` separately and read-only, and set `CODEX_SESSION_INDEX_PATH` to the
+  mounted container path
 - Store DuckDB in a persistent writable volume
 - Receive Linear credentials through environment variables or secrets
 - Expose a health endpoint
 - Close the file watcher and DuckDB connections during graceful shutdown
 - Serve the built frontend assets
 
-Docker Compose does not need a DuckDB service because DuckDB is embedded in this process.
+Docker Compose does not need a DuckDB service because DuckDB is embedded in this process. Do not
+mount the complete `~/.codex` directory: it may contain credentials and unrelated state. If the
+packaged deployment does not provide the index mount, the service remains healthy but title
+backfill and title-derived attribution are degraded.
 
 ## Verification
 

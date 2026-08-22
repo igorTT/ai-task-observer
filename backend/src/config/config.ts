@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 const defaultPricingCatalogPath = fileURLToPath(
   new URL("../../config/models.json", import.meta.url),
 );
+const defaultCodexSessionIndexPath = resolve(homedir(), ".codex", "session_index.jsonl");
 
 const logLevels = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
 
@@ -45,6 +46,12 @@ const environmentSchema = z.object({
       return [...new Set(roots)];
     })
     .default([resolve(homedir(), ".codex", "sessions")]),
+  CODEX_SESSION_INDEX_PATH: z
+    .string()
+    .trim()
+    .min(1, "CODEX_SESSION_INDEX_PATH must not be empty")
+    .transform((value) => resolve(value))
+    .default(defaultCodexSessionIndexPath),
   CODEX_READ_CHUNK_BYTES: positiveInteger(
     "CODEX_READ_CHUNK_BYTES",
     1_024,
@@ -79,6 +86,7 @@ export interface AppConfig {
   readonly databasePath: string;
   readonly logLevel: (typeof logLevels)[number];
   readonly codexSessionRoots: readonly string[];
+  readonly codexSessionIndexPath: string;
   readonly codexReadChunkBytes: number;
   readonly codexWatchDebounceMs: number;
   readonly codexRootRediscoveryMs: number;
@@ -116,6 +124,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv): Readonly<AppConfig> 
     databasePath: parsed.data.DATABASE_PATH,
     logLevel: parsed.data.LOG_LEVEL,
     codexSessionRoots: Object.freeze(parsed.data.CODEX_SESSION_ROOTS),
+    codexSessionIndexPath: parsed.data.CODEX_SESSION_INDEX_PATH,
     codexReadChunkBytes: parsed.data.CODEX_READ_CHUNK_BYTES,
     codexWatchDebounceMs: parsed.data.CODEX_WATCH_DEBOUNCE_MS,
     codexRootRediscoveryMs: parsed.data.CODEX_ROOT_REDISCOVERY_MS,

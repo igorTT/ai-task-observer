@@ -22,10 +22,13 @@ const logger = pino({ enabled: false });
 async function setup(
   roots: readonly string[],
   discover?: (root: string) => Promise<RootDiscoveryStatus>,
+  afterCommit?: (sessionIds: readonly string[], indexPath: string) => void | Promise<void>,
 ): Promise<{
   database: AppDatabase;
   repository: CodexIngestionRepository;
   coordinator: IngestionCoordinator;
+  indexPath: string;
+  committed: string[][];
 }> {
   const directory = await mkdtemp(join(tmpdir(), "codex-coordinator-db-"));
   directories.push(directory);
@@ -33,9 +36,12 @@ async function setup(
   databases.push(database);
   await applyMigrations(database, logger);
   const repository = new CodexIngestionRepository(database);
+  const indexPath = join(directory, "session_index.jsonl");
+  const committed: string[][] = [];
   const importer = new CodexSourceImporter({ repository, readChunkBytes: 256, logger });
   const coordinator = new IngestionCoordinator({
     roots,
+    sessionIndexPath: indexPath,
     importer,
     repository,
     logger,
@@ -43,9 +49,13 @@ async function setup(
     rediscoveryMs: 30,
     watchUsePolling: true,
     ...(discover ? { discover } : {}),
+    onSessionsCommitted: async (sessionIds) => {
+      committed.push([...sessionIds]);
+      await afterCommit?.(sessionIds, indexPath);
+    },
   });
   coordinators.push(coordinator);
-  return { database, repository, coordinator };
+  return { database, repository, coordinator, indexPath, committed };
 }
 
 afterEach(async () => {
@@ -57,6 +67,125 @@ afterEach(async () => {
 });
 
 describe("ingestion coordinator", () => {
+  test("backfills existing sessions from the index without creating orphan sessions", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-index-startup-"));
+    directories.push(root);
+    await copyFile(fixture, join(root, "session.jsonl"));
+    const opened = await setup([root]);
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-999: indexed",
+      updated_at: "2026-01-03T03:10:00.000Z",
+    });
+    await opened.coordinator.start();
+
+    expect(await opened.repository.sessions.findById("session-001")).toMatchObject({
+      currentTitle: "ENG-999: indexed",
+      developerTurns: 1n,
+    });
+    expect(await opened.repository.sessions.findById("orphan")).toBeUndefined();
+    expect(opened.committed).toEqual([["session-001"], ["session-001"]]);
+  });
+
+  test("reconciles an index replacement that happens before the watcher reaches ready", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-index-ready-race-"));
+    directories.push(root);
+    await copyFile(fixture, join(root, "session.jsonl"));
+    let commits = 0;
+    const opened = await setup([root], undefined, async (_sessionIds, indexPath) => {
+      commits += 1;
+      if (commits === 2) {
+        await writeIndex(indexPath, {
+          id: "session-001",
+          thread_name: "ENG-101: ready-race-update",
+          updated_at: "2026-01-03T03:11:00.000Z",
+        });
+      }
+    });
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-101: initial-index-title",
+      updated_at: "2026-01-03T03:10:00.000Z",
+    });
+
+    await opened.coordinator.start();
+
+    expect(commits).toBe(3);
+    expect((await opened.repository.sessions.findById("session-001"))?.currentTitle).toBe(
+      "ENG-101: ready-race-update",
+    );
+  });
+
+  test("reconciles an index-only rename during an explicit rescan", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-index-rescan-"));
+    directories.push(root);
+    await copyFile(fixture, join(root, "session.jsonl"));
+    const opened = await setup([root]);
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-101: apply",
+      updated_at: "2026-01-03T03:10:00.000Z",
+    });
+    await opened.coordinator.start();
+    const before = await opened.repository.usage.findBySessionId("session-001");
+
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-101: verify",
+      updated_at: "2026-01-03T03:11:00.000Z",
+    });
+    await opened.coordinator.rescan();
+    await waitForIdle(opened.coordinator);
+
+    expect((await opened.repository.sessions.findById("session-001"))?.currentTitle).toBe(
+      "ENG-101: verify",
+    );
+    expect(await opened.repository.usage.findBySessionId("session-001")).toMatchObject({
+      inputTokens: before?.inputTokens,
+      totalTokens: before?.totalTokens,
+    });
+  });
+
+  test("watches index-only renames, preserves titles on malformed input, and clears valid empty names", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-index-watch-"));
+    directories.push(root);
+    await copyFile(fixture, join(root, "session.jsonl"));
+    const opened = await setup([root]);
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-101: apply",
+      updated_at: "2026-01-03T03:10:00.000Z",
+    });
+    await opened.coordinator.start();
+
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "ENG-101: verify",
+      updated_at: "2026-01-03T03:11:00.000Z",
+    });
+    await waitFor(
+      async () =>
+        (await opened.repository.sessions.findById("session-001"))?.currentTitle ===
+        "ENG-101: verify",
+    );
+
+    await writeFile(opened.indexPath, '{"id":"broken"\n');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect((await opened.repository.sessions.findById("session-001"))?.currentTitle).toBe(
+      "ENG-101: verify",
+    );
+
+    await writeIndex(opened.indexPath, {
+      id: "session-001",
+      thread_name: "",
+      updated_at: "2026-01-03T03:12:00.000Z",
+    });
+    await waitFor(
+      async () =>
+        (await opened.repository.sessions.findById("session-001"))?.currentTitle === undefined,
+    );
+  });
+
   test("watches new files, debounces duplicate notifications, and shuts down cleanly", async () => {
     const root = await mkdtemp(join(tmpdir(), "codex-watcher-"));
     directories.push(root);
@@ -161,4 +290,15 @@ async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 3_000): Pr
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error("Timed out waiting for ingestion state");
+}
+
+async function waitForIdle(coordinator: IngestionCoordinator): Promise<void> {
+  await waitFor(async () => (await coordinator.status()).currentRun === undefined);
+}
+
+async function writeIndex(
+  path: string,
+  record: { id: string; thread_name: string; updated_at: string },
+): Promise<void> {
+  await writeFile(path, `${JSON.stringify(record)}\n`);
 }

@@ -190,6 +190,7 @@ function createIngestion(
   });
   const coordinator = new IngestionCoordinator({
     roots: config.codexSessionRoots,
+    sessionIndexPath: config.codexSessionIndexPath,
     importer,
     repository,
     logger,

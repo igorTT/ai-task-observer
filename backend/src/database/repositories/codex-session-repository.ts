@@ -71,6 +71,25 @@ export class CodexSessionRepository {
     await statement.run();
   }
 
+  public async updateCurrentTitles(
+    titles: ReadonlyMap<string, string | null>,
+  ): Promise<Set<string>> {
+    const changed = new Set<string>();
+    for (const [sessionId, title] of titles) {
+      const existing = await this.findById(sessionId);
+      if (!existing || (existing.currentTitle ?? null) === title) continue;
+      const statement = await this.connection.prepare(`
+        UPDATE codex_sessions
+        SET current_title = $title, updated_at = now()
+        WHERE session_id = $sessionId
+      `);
+      statement.bind({ sessionId, title });
+      await statement.run();
+      changed.add(sessionId);
+    }
+    return changed;
+  }
+
   public async findById(sessionId: string): Promise<CodexSessionRecord | undefined> {
     const statement = await this.connection.prepare(
       "SELECT * FROM codex_sessions WHERE session_id = $sessionId",

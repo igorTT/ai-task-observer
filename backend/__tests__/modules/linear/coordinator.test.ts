@@ -149,6 +149,33 @@ describe("AttributionCoordinator", () => {
     await opened.coordinator.close();
   });
 
+  test("reconciles an index title through notification without moving the committed link", async () => {
+    const opened = await setup(["ENG-1: apply"], {
+      findIssue: (identifier) => Promise.resolve(found(identifier)),
+    });
+    await opened.coordinator.start();
+    await waitForIdle(opened.coordinator);
+    const before = await opened.ingestion.usage.findBySessionId("session-1");
+
+    const changed = await opened.ingestion.reconcileSessionIndexTitles(
+      new Map([["session-1", "ENG-2: verify"]]),
+    );
+    await opened.coordinator.notifySessions([...changed]);
+    await waitForIdle(opened.coordinator);
+
+    expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
+      status: "linked",
+      candidateIdentifier: "ENG-2",
+      phase: "verify",
+      linearId: "id-ENG-1",
+    });
+    expect(await opened.ingestion.usage.findBySessionId("session-1")).toMatchObject({
+      inputTokens: before?.inputTokens,
+      totalTokens: before?.totalTokens,
+    });
+    await opened.coordinator.close();
+  });
+
   test("keeps candidates unconfigured without calls and later recovers from not found", async () => {
     const unconfigured = await setup(["ENG-3"]);
     await unconfigured.coordinator.start();

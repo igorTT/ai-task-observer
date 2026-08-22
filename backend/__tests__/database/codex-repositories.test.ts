@@ -68,6 +68,47 @@ describe("Codex ingestion repositories", () => {
     opened.database.close();
   });
 
+  test("updates only existing session titles without changing usage or attribution-owned data", async () => {
+    const opened = await repository();
+    await opened.repository.sessions.upsert(
+      { sessionId: "indexed", sourceRoot: "/one", sourcePath: "/one/a.jsonl", title: "old" },
+      3,
+    );
+    await opened.repository.usage.replaceTokens("indexed", {
+      input: 10n,
+      cachedInput: 2n,
+      output: 3n,
+    });
+    const before = await opened.repository.sessions.findById("indexed");
+
+    const changed = await opened.repository.reconcileSessionIndexTitles(
+      new Map([
+        ["indexed", "new"],
+        ["orphan", "must not create"],
+      ]),
+    );
+
+    expect(changed).toEqual(new Set(["indexed"]));
+    expect(await opened.repository.sessions.findById("indexed")).toMatchObject({
+      currentTitle: "new",
+      sourcePath: before?.sourcePath,
+      developerTurns: before?.developerTurns,
+    });
+    expect(await opened.repository.usage.findBySessionId("indexed")).toMatchObject({
+      inputTokens: 10n,
+      cachedInputTokens: 2n,
+      outputTokens: 3n,
+    });
+    expect(await opened.repository.sessions.findById("orphan")).toBeUndefined();
+
+    const cleared = await opened.repository.reconcileSessionIndexTitles(
+      new Map([["indexed", null]]),
+    );
+    expect(cleared).toEqual(new Set(["indexed"]));
+    expect((await opened.repository.sessions.findById("indexed"))?.currentTitle).toBeUndefined();
+    opened.database.close();
+  });
+
   test("atomically rolls back selected facts, parse state, summary, and checkpoint", async () => {
     const opened = await repository();
     const chunk = sourceChunk("rolled-back", "/root/failing.jsonl", [], []);

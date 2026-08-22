@@ -20,6 +20,7 @@ describe("loadConfig", () => {
       databasePath: "./data/test.duckdb",
       logLevel: "debug",
       codexSessionRoots: [resolve(homedir(), ".codex", "sessions")],
+      codexSessionIndexPath: resolve(homedir(), ".codex", "session_index.jsonl"),
       codexReadChunkBytes: 1_024 * 1_024,
       codexWatchDebounceMs: 1_000,
       codexRootRediscoveryMs: 60_000,
@@ -58,6 +59,17 @@ describe("loadConfig", () => {
     expect(config.codexWatchDebounceMs).toBe(50);
     expect(config.codexRootRediscoveryMs).toBe(1000);
     expect(Object.isFrozen(config.codexSessionRoots)).toBe(true);
+  });
+
+  test("normalizes a custom session index path", () => {
+    expect(
+      loadConfig({ CODEX_SESSION_INDEX_PATH: " ./fixtures/session_index.jsonl " }),
+    ).toMatchObject({
+      codexSessionIndexPath: resolve("./fixtures/session_index.jsonl"),
+    });
+    expect(() => loadConfig({ CODEX_SESSION_INDEX_PATH: " " })).toThrow(
+      /CODEX_SESSION_INDEX_PATH/u,
+    );
   });
 
   test("reports the invalid setting", () => {

@@ -12,6 +12,10 @@ import {
 } from "@/modules/sessions/discovery.js";
 import type { CodexSourceImporter } from "@/modules/sessions/importer.js";
 import type { ImportRun, ImportTrigger } from "@/modules/sessions/domain.js";
+import {
+  readSessionIndexSnapshot,
+  type SessionIndexSnapshot,
+} from "@/modules/sessions/session-index-reader.js";
 
 export interface RescanResult {
   readonly runId: string;
@@ -36,6 +40,7 @@ export interface IngestionStatusSnapshot {
 
 export interface IngestionCoordinatorOptions {
   readonly roots: readonly string[];
+  readonly sessionIndexPath: string;
   readonly importer: CodexSourceImporter;
   readonly repository: CodexIngestionRepository;
   readonly logger: Logger;
@@ -43,11 +48,13 @@ export interface IngestionCoordinatorOptions {
   readonly rediscoveryMs: number;
   readonly watchUsePolling?: boolean;
   readonly discover?: (root: string) => Promise<RootDiscoveryStatus>;
+  readonly readSessionIndex?: (path: string) => Promise<SessionIndexSnapshot>;
   readonly onSessionsCommitted?: (sessionIds: readonly string[]) => void | Promise<void>;
 }
 
 export class IngestionCoordinator {
   readonly #roots: readonly string[];
+  readonly #sessionIndexPath: string;
   readonly #importer: CodexSourceImporter;
   readonly #repository: CodexIngestionRepository;
   readonly #logger: Logger;
@@ -55,19 +62,25 @@ export class IngestionCoordinator {
   readonly #rediscoveryMs: number;
   readonly #watchUsePolling: boolean;
   readonly #discover: (root: string) => Promise<RootDiscoveryStatus>;
+  readonly #readSessionIndex: (path: string) => Promise<SessionIndexSnapshot>;
   readonly #onSessionsCommitted: (sessionIds: readonly string[]) => void | Promise<void>;
   readonly #rootStatus = new Map<string, RootDiscoveryStatus>();
   readonly #watchers = new Map<string, FSWatcher>();
+  #sessionIndexWatcher: FSWatcher | undefined;
   readonly #debounceTimers = new Map<string, NodeJS.Timeout>();
+  #sessionIndexDebounceTimer: NodeJS.Timeout | undefined;
   readonly #pending = new Map<string, { root: string; runId?: string }>();
   #acceptingWork = false;
   #drainPromise: Promise<void> | undefined;
   #runPromise: Promise<void> | undefined;
   #currentRunId: string | undefined;
   #rediscoveryTimer: NodeJS.Timeout | undefined;
+  #indexReconcilePromise: Promise<void> | undefined;
+  #indexReconcilePending = false;
 
   public constructor(options: IngestionCoordinatorOptions) {
     this.#roots = options.roots;
+    this.#sessionIndexPath = options.sessionIndexPath;
     this.#importer = options.importer;
     this.#repository = options.repository;
     this.#logger = options.logger;
@@ -75,6 +88,7 @@ export class IngestionCoordinator {
     this.#rediscoveryMs = options.rediscoveryMs;
     this.#watchUsePolling = options.watchUsePolling ?? false;
     this.#discover = options.discover ?? discoverRoot;
+    this.#readSessionIndex = options.readSessionIndex ?? readSessionIndexSnapshot;
     this.#onSessionsCommitted = options.onSessionsCommitted ?? (() => undefined);
   }
 
@@ -90,6 +104,7 @@ export class IngestionCoordinator {
     this.#rediscoveryTimer.unref();
     await this.#scheduleRun("startup");
     await this.#runPromise;
+    await this.#watchSessionIndex();
   }
 
   public async rescan(): Promise<RescanResult> {
@@ -134,20 +149,25 @@ export class IngestionCoordinator {
   }
 
   public async close(): Promise<void> {
-    if (!this.#acceptingWork && this.#watchers.size === 0) return;
+    if (!this.#acceptingWork && this.#watchers.size === 0 && !this.#sessionIndexWatcher) return;
     this.#acceptingWork = false;
     if (this.#rediscoveryTimer) clearInterval(this.#rediscoveryTimer);
     this.#rediscoveryTimer = undefined;
     for (const timer of this.#debounceTimers.values()) clearTimeout(timer);
     this.#debounceTimers.clear();
+    if (this.#sessionIndexDebounceTimer) clearTimeout(this.#sessionIndexDebounceTimer);
+    this.#sessionIndexDebounceTimer = undefined;
     await Promise.all(
       [...this.#watchers.values()].map((watcher) => Promise.resolve(watcher.close())),
     );
     this.#watchers.clear();
+    await this.#sessionIndexWatcher?.close();
+    this.#sessionIndexWatcher = undefined;
     const pending = [this.#runPromise, this.#drainPromise].filter(
       (operation): operation is Promise<void> => operation !== undefined,
     );
     await Promise.all(pending);
+    await this.#indexReconcilePromise;
   }
 
   async #refreshRoots(mode: "all" | "unavailable", initial: boolean): Promise<void> {
@@ -204,6 +224,35 @@ export class IngestionCoordinator {
     this.#watchers.set(configuredRoot, watcher);
   }
 
+  async #watchSessionIndex(): Promise<void> {
+    if (this.#sessionIndexWatcher) return;
+    const watcher = chokidar.watch(this.#sessionIndexPath, {
+      ignoreInitial: true,
+      persistent: true,
+      usePolling: this.#watchUsePolling,
+      interval: Math.min(this.#debounceMs, 100),
+    });
+    const enqueue = (): void => this.#debounceSessionIndex();
+    watcher.on("add", enqueue);
+    watcher.on("change", enqueue);
+    watcher.on("unlink", enqueue);
+    watcher.on("error", (error) => {
+      this.#sessionIndexWatcher = undefined;
+      void watcher.close();
+      this.#logger.warn(
+        { error: errorName(error), source: basename(this.#sessionIndexPath) },
+        "Codex session index watcher failed",
+      );
+    });
+    await new Promise<void>((resolveReady) => watcher.once("ready", resolveReady));
+    if (!this.#acceptingWork) {
+      await watcher.close();
+      return;
+    }
+    this.#sessionIndexWatcher = watcher;
+    await this.#requestIndexReconcile();
+  }
+
   #debounce(root: string, path: string): void {
     if (!this.#acceptingWork) return;
     const previous = this.#debounceTimers.get(path);
@@ -213,6 +262,21 @@ export class IngestionCoordinator {
       this.#enqueue(root, path);
     }, this.#debounceMs);
     this.#debounceTimers.set(path, timer);
+  }
+
+  #debounceSessionIndex(): void {
+    if (!this.#acceptingWork) return;
+    if (this.#sessionIndexDebounceTimer) clearTimeout(this.#sessionIndexDebounceTimer);
+    this.#sessionIndexDebounceTimer = setTimeout(() => {
+      this.#sessionIndexDebounceTimer = undefined;
+      void this.#requestIndexReconcile().catch((error: unknown) =>
+        this.#logger.warn(
+          { error: errorName(error), source: basename(this.#sessionIndexPath) },
+          "Codex session index reconciliation failed",
+        ),
+      );
+    }, this.#debounceMs);
+    this.#sessionIndexDebounceTimer.unref();
   }
 
   async #scheduleRun(trigger: ImportTrigger, onlyRoot?: string): Promise<string> {
@@ -233,7 +297,10 @@ export class IngestionCoordinator {
           for (const path of status.files) this.#enqueue(status.root, path, runId);
         }
         await this.#repository.runs.addProgress(runId, { rootsDiscovered, filesDiscovered });
-        await this.#drain();
+        do {
+          await this.#drain();
+          await this.#requestIndexReconcile();
+        } while (this.#pending.size > 0);
         await this.#repository.runs.setState(runId, "completed");
       } catch (error) {
         await this.#repository.runs.addProgress(runId, { errors: 1 });
@@ -248,6 +315,63 @@ export class IngestionCoordinator {
       }
     })();
     return runId;
+  }
+
+  #requestIndexReconcile(): Promise<void> {
+    this.#indexReconcilePending = true;
+    if (this.#indexReconcilePromise) return this.#indexReconcilePromise;
+    const operation = this.#runIndexReconcile();
+    this.#indexReconcilePromise = operation;
+    const clear = (): void => {
+      if (this.#indexReconcilePromise === operation) this.#indexReconcilePromise = undefined;
+    };
+    void operation.then(clear, clear);
+    return operation;
+  }
+
+  async #runIndexReconcile(): Promise<void> {
+    while (this.#indexReconcilePending) {
+      this.#indexReconcilePending = false;
+      let snapshot: SessionIndexSnapshot;
+      try {
+        snapshot = await this.#readSessionIndex(this.#sessionIndexPath);
+      } catch (error) {
+        this.#logger.warn(
+          { error: errorName(error), source: basename(this.#sessionIndexPath) },
+          "Codex session index read failed",
+        );
+        continue;
+      }
+      this.#logIndexDiagnostics(snapshot);
+      if (!snapshot.available) continue;
+      const titles = new Map<string, string | null>();
+      for (const entry of snapshot.entries.values()) {
+        if (entry.threadName !== undefined) {
+          titles.set(entry.sessionId, entry.threadName.length === 0 ? null : entry.threadName);
+        }
+      }
+      const changed = await this.#repository.reconcileSessionIndexTitles(titles);
+      if (changed.size > 0) await this.#onSessionsCommitted([...changed]);
+    }
+  }
+
+  #logIndexDiagnostics(snapshot: SessionIndexSnapshot): void {
+    if (!snapshot.available) {
+      this.#logger.warn(
+        { source: basename(this.#sessionIndexPath), category: "source_failure" },
+        "Codex session index unavailable",
+      );
+      return;
+    }
+    if (snapshot.diagnostics.diagnostics.length === 0) return;
+    this.#logger.warn(
+      {
+        source: basename(this.#sessionIndexPath),
+        malformedRecords: snapshot.diagnostics.malformedRecords,
+        incompleteRecords: snapshot.diagnostics.incompleteRecords,
+      },
+      "Codex session index contained ignored records",
+    );
   }
 
   #enqueue(root: string, path: string, runId?: string): void {

@@ -63,15 +63,23 @@ before Node.js execution; `npm run verify:aliases` checks this boundary.
 Configuration is read and validated once at startup. `CODEX_SESSION_ROOTS` accepts one or
 more comma-separated session directories and defaults to the current user's
 `~/.codex/sessions`. The roots may be read-only and do not require Linear credentials.
+Current session titles come from the separately configured, read-only
+`CODEX_SESSION_INDEX_PATH`, which defaults to `~/.codex/session_index.jsonl`. The index is
+optional: a missing, unreadable, malformed, or partially written index does not stop rollout
+ingestion, and an absent index entry preserves a previously stored title. Only the stable session
+ID, thread name, and update timestamp are read; raw index records are never persisted or exposed.
 
 `LINEAR_API_KEY` is optional. Without it, backend health and Codex ingestion remain available,
 candidate titles report an unconfigured attribution state, and no Linear request is made. When
 configured, the integration uses the official Linear SDK only for exact, read-only issue lookup.
 
-On startup the backend recursively backfills every available root, then watches for new and
-changed `.jsonl` files. Duplicate notifications are debounced and complete appended records
-resume from an atomic byte checkpoint. A missing root does not fail process health: ingestion
-reports it unavailable and periodically rediscovers it if the mount or directory appears later.
+On startup the backend recursively backfills every available root, reconciles titles from the
+session index, then watches for new and changed rollout `.jsonl` files and index renames. Duplicate
+notifications are debounced and complete appended records resume from an atomic byte checkpoint.
+Index title changes are authoritative and flow through the existing attribution reconciliation;
+they do not rewrite rollout usage facts or move a committed Linear link. A missing root or index
+does not fail process health: ingestion reports unavailable input and continues when it becomes
+readable.
 
 ```bash
 curl http://127.0.0.1:3000/api/imports/status
@@ -262,11 +270,20 @@ DuckDB is embedded in the backend, so Docker Compose does not require a separate
 The production deployment is expected to use one application container with:
 
 - A read-only bind mount containing Codex session files
+- A separate read-only bind mount containing `session_index.jsonl`, with
+  `CODEX_SESSION_INDEX_PATH` set to its in-container path
 - A writable volume for DuckDB data
 - Linear credentials provided through environment variables or secrets
 - The built frontend served by the backend
 
-Only the required Codex session directory should be mounted. The complete Codex configuration directory may contain credentials and should not be exposed to the container.
+Only the required Codex session directory and index file should be mounted. The complete Codex
+configuration directory may contain credentials and should not be exposed to the container. If a
+packaged configuration omits the index mount, rollout ingestion remains available but current
+titles and title-derived attribution may be unavailable until the path is configured.
+
+Titles are index-driven. Bumping the rollout parser version cannot recover titles from rollout
+files that do not contain title records. The active `link-current-codex-session` workflow depends
+on this index reconciliation capability for reliable current titles.
 
 ## Development status
 

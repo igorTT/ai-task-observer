@@ -283,6 +283,44 @@ describe("session and import HTTP contract", () => {
       );
     });
   });
+
+  test("exposes reconciled index titles through list and detail without source metadata", async () => {
+    const opened = await setup();
+    await opened.repository.sessions.upsert(
+      {
+        sessionId: "indexed-session",
+        sourceRoot: "/private/root",
+        sourcePath: "/private/root/indexed-session.jsonl",
+        title: "old title",
+      },
+      3,
+    );
+    await opened.repository.usage.ensure("indexed-session");
+    await opened.repository.reconcileSessionIndexTitles(
+      new Map([["indexed-session", "ENG-404: indexed rename"]]),
+    );
+
+    await withApp(opened.app, async (app) => {
+      const list = await request(app).get("/api/sessions?limit=100&offset=0");
+      const detail = await request(app).get("/api/sessions/indexed-session");
+      const listBody = list.body as SessionPageResponse;
+      const detailBody = detail.body as SessionResponse;
+      expect(list.status).toBe(200);
+      expect(
+        listBody.items.some(
+          (item) =>
+            item.sessionId === "indexed-session" && item.currentTitle === "ENG-404: indexed rename",
+        ),
+      ).toBe(true);
+      expect(detail.status).toBe(200);
+      expect(detailBody).toMatchObject({
+        sessionId: "indexed-session",
+        currentTitle: "ENG-404: indexed rename",
+      });
+      expect(JSON.stringify([listBody, detailBody])).not.toContain("private/root");
+      expect(JSON.stringify([listBody, detailBody])).not.toContain("session_index");
+    });
+  });
 });
 
 async function withApp<T>(

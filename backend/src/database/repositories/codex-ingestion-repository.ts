@@ -38,6 +38,12 @@ export class CodexIngestionRepository {
     return this.database.exclusiveWrite(() => this.#applySourceChunk(chunk));
   }
 
+  public async reconcileSessionIndexTitles(
+    titles: ReadonlyMap<string, string | null>,
+  ): Promise<Set<string>> {
+    return this.database.exclusiveWrite(() => this.sessions.updateCurrentTitles(titles));
+  }
+
   async #applySourceChunk(chunk: SourceChunkMutation): Promise<Set<string>> {
     const touched = new Set<string>([
       ...chunk.mutations.flatMap((mutation) => {
