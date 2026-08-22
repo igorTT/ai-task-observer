@@ -7,7 +7,12 @@ import { Table } from "@/components/ui/table";
 import { MetricGrid, MetricState } from "@/features/issues/metrics";
 import { PageHeading, PageLoading, RequestError } from "@/features/issues/issue-list-page";
 import { normalizeApiError } from "@/lib/api-error";
-import { formatNullableCount, formatUtcDate, formatUsd } from "@/lib/formatters";
+import {
+  formatCompactTokenCount,
+  formatNullableCount,
+  formatUtcDate,
+  formatUsd,
+} from "@/lib/formatters";
 
 export function IssueDetailPage() {
   const issueId = useParams().issueId ?? "";
@@ -76,7 +81,7 @@ export function IssueDetailPage() {
           session.phase ?? "No phase",
           session.importState,
           `${formatUtcDate(session.startedAt)} – ${formatUtcDate(session.endedAt)}`,
-          formatNullableCount(session.metrics.totalTokens),
+          formatCompactTokenCount(session.metrics.totalTokens),
           <div key="cost">
             {formatUsd(session.metrics.estimatedCostUsd)}
             <div className="mt-2">
@@ -91,7 +96,7 @@ export function IssueDetailPage() {
         rows={models.map((model) => [
           model.model === "unknown" ? "Unknown model" : model.model,
           model.observedModels.join(", ") || "None",
-          formatNullableCount(model.metrics.totalTokens),
+          formatCompactTokenCount(model.metrics.totalTokens),
           formatUsd(model.metrics.estimatedCostUsd),
         ])}
       />
@@ -102,7 +107,7 @@ export function IssueDetailPage() {
           rows={daily.map((day) => [
             day.date ?? "Unknown time",
             formatNullableCount(day.metrics.sessionCount),
-            formatNullableCount(day.metrics.totalTokens),
+            formatCompactTokenCount(day.metrics.totalTokens),
             formatUsd(day.metrics.estimatedCostUsd),
           ])}
         />

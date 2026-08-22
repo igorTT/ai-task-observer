@@ -32,6 +32,15 @@ export interface SessionRelinkResponse {
   readonly attribution: SessionAttributionResponse;
 }
 
+export interface SessionRelinkRequest {
+  /**
+   * Exact Linear issue identifier to link or relink.
+   * @pattern ^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$
+   * @example ENG-215
+   */
+  readonly issueIdentifier: string;
+}
+
 export interface SessionRelinkErrorResponse {
   readonly error: {
     readonly code: string;

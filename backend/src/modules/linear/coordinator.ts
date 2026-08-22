@@ -136,11 +136,11 @@ export class AttributionCoordinator {
     return { runId, state: "queued", coalesced: false };
   }
 
-  public relink(sessionId: string): Promise<SessionAttribution> {
+  public relink(sessionId: string, issueIdentifier: string): Promise<SessionAttribution> {
     if (!this.#acceptingWork) {
       return Promise.reject(new Error("Linear attribution is shutting down"));
     }
-    const relink = this.#relinkService.relink(sessionId);
+    const relink = this.#relinkService.relink(sessionId, issueIdentifier);
     this.#activeRelinks.add(relink);
     const remove = (): void => {
       this.#activeRelinks.delete(relink);

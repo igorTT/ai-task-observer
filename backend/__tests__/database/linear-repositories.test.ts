@@ -117,4 +117,64 @@ describe("Linear attribution repositories", () => {
       linkedCount: 1,
     });
   });
+
+  test("refreshes an issue after one session references it and links a second session", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "linear-repositories-shared-issue-"));
+    directories.push(directory);
+    const database = await AppDatabase.open(join(directory, "test.duckdb"));
+    databases.push(database);
+    await applyMigrations(database, pino({ enabled: false }));
+    const sessions = new CodexSessionRepository(database.connection);
+    const issues = new LinearIssueRepository(database.connection);
+    const attributions = new LinearSessionAttributionRepository(database.connection);
+    for (const sessionId of ["session-1", "session-2"]) {
+      await sessions.upsert(
+        {
+          sessionId,
+          sourceRoot: "/root",
+          sourcePath: `/root/${sessionId}.jsonl`,
+          title: "ENG-42",
+        },
+        2,
+      );
+    }
+    const issue = {
+      linearId: "issue-42",
+      identifier: "ENG-42",
+      title: "Initial title",
+      url: "https://linear.app/example/issue/ENG-42",
+      team: { id: "team", key: "ENG", name: "Engineering" },
+      state: { id: "state", name: "In Progress" },
+      updatedAt: new Date("2026-08-09T09:00:00.000Z"),
+    };
+    await issues.upsert(issue, new Date("2026-08-09T10:00:00.000Z"));
+    await attributions.save({
+      sessionId: "session-1",
+      titleFingerprint: "first",
+      candidateIdentifier: "ENG-42",
+      status: "linked",
+      linearId: "issue-42",
+    });
+
+    const refreshedAt = new Date("2026-08-09T11:00:00.000Z");
+    await issues.upsert({ ...issue, title: "Refreshed title" }, refreshedAt);
+    await attributions.save({
+      sessionId: "session-2",
+      titleFingerprint: "second",
+      candidateIdentifier: "ENG-42",
+      status: "linked",
+      linearId: "issue-42",
+    });
+
+    expect(await issues.findById("issue-42")).toMatchObject({
+      title: "Refreshed title",
+      syncedAt: refreshedAt,
+    });
+    expect(
+      (await attributions.list()).map(({ sessionId, linearId }) => ({ sessionId, linearId })),
+    ).toEqual([
+      { sessionId: "session-1", linearId: "issue-42" },
+      { sessionId: "session-2", linearId: "issue-42" },
+    ]);
+  });
 });

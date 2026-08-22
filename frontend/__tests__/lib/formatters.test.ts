@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { normalizeApiError } from "@/lib/api-error";
 import {
   formatCode,
+  formatCompactTokenCount,
   formatDecimalCount,
   formatDuration,
   formatNullableCount,
@@ -15,6 +16,32 @@ describe("honest formatting", () => {
     expect(formatDecimalCount("900719925474099312345")).toBe("900,719,925,474,099,312,345");
     expect(formatNullableCount(null)).toBe("Unavailable");
     expect(formatNullableCount("0")).toBe("0");
+  });
+
+  test("formats compact token counts with safe truncation", () => {
+    expect(formatCompactTokenCount("0")).toBe("0");
+    expect(formatCompactTokenCount("000999")).toBe("999");
+    expect(formatCompactTokenCount("1000")).toBe("1k");
+    expect(formatCompactTokenCount("1700")).toBe("1.7k");
+    expect(formatCompactTokenCount("99900")).toBe("99.9k");
+    expect(formatCompactTokenCount("100000")).toBe("100k");
+    expect(formatCompactTokenCount("999999")).toBe("999k");
+    expect(formatCompactTokenCount("1000000")).toBe("1m");
+    expect(formatCompactTokenCount("12700000")).toBe("12.7m");
+    expect(formatCompactTokenCount("999999999")).toBe("999m");
+    expect(formatCompactTokenCount("1000000000")).toBe("1b");
+    expect(formatCompactTokenCount("999999999999")).toBe("999b");
+    expect(formatCompactTokenCount("1000000000000")).toBe("1t");
+    expect(formatCompactTokenCount("12700000000000")).toBe("12.7t");
+    expect(formatCompactTokenCount("1000000000000000")).toBe("1000t");
+    expect(formatCompactTokenCount("999999999999999")).toBe("999t");
+    expect(formatCompactTokenCount("900719925474099312345")).toBe("900719925t");
+  });
+
+  test("rejects unavailable and malformed token counts", () => {
+    for (const value of [null, "", "-1", "+1", "1.5", " 1000", "1000 "]) {
+      expect(formatCompactTokenCount(value)).toBe("Unavailable");
+    }
   });
 
   test("formats decimal USD without binary floating point", () => {

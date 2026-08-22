@@ -140,6 +140,14 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SessionRelinkRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "issueIdentifier": {"dataType":"string","required":true,"validators":{"pattern":{"value":"^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$"}}},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "Record_AttributionStatus.number_": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"unlinked":{"dataType":"double","required":true},"unconfigured":{"dataType":"double","required":true},"pending":{"dataType":"double","required":true},"linked":{"dataType":"double","required":true},"not_found":{"dataType":"double","required":true},"error":{"dataType":"double","required":true}},"validators":{}},
@@ -535,6 +543,7 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsSessionsController_relink: Record<string, TsoaRoute.ParameterSchema> = {
                 sessionId: {"in":"path","name":"sessionId","required":true,"dataType":"string"},
+                request: {"in":"body","name":"request","required":true,"ref":"SessionRelinkRequest"},
         };
         app.post('/api/sessions/:sessionId/relink',
             ...(fetchMiddlewares<RequestHandler>(SessionsController)),

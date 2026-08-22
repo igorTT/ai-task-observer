@@ -10,7 +10,12 @@ import { Pagination } from "@/components/ui/pagination";
 import { MetricState } from "@/features/issues/metrics";
 import { PageHeading, PageLoading, RequestError } from "@/features/issues/issue-list-page";
 import { normalizeApiError } from "@/lib/api-error";
-import { formatCode, formatNullableCount, formatUtcDate } from "@/lib/formatters";
+import {
+  formatCode,
+  formatCompactTokenCount,
+  formatNullableCount,
+  formatUtcDate,
+} from "@/lib/formatters";
 import { PAGE_SIZE, pageOffset, totalPages, useUrlPage } from "@/lib/pagination";
 
 export function SessionPage() {
@@ -53,8 +58,12 @@ function SessionCard({ session, linearReady }: { session: SessionResponse; linea
     attribution.candidateIdentifier && linearReady && attribution.status !== "pending",
   );
   const commit = async () => {
+    if (!attribution.candidateIdentifier) return;
     try {
-      await relink({ sessionId: session.sessionId }).unwrap();
+      await relink({
+        sessionId: session.sessionId,
+        sessionRelinkRequest: { issueIdentifier: attribution.candidateIdentifier },
+      }).unwrap();
       setOpen(false);
     } catch {
       /* rendered below */
@@ -105,7 +114,7 @@ function SessionCard({ session, linearReady }: { session: SessionResponse; linea
           <dt>Usage</dt>
           <dd>
             {session.usageObserved
-              ? `${formatNullableCount(session.totalTokens)} tokens`
+              ? `${formatCompactTokenCount(session.totalTokens)} tokens`
               : "No usage observed"}
           </dd>
         </div>

@@ -17,7 +17,11 @@ const injectedRtkApi = api.injectEndpoints({
       query: (queryArg) => ({ url: `/api/sessions/${queryArg.sessionId}` }),
     }),
     relink: build.mutation<RelinkApiResponse, RelinkApiArg>({
-      query: (queryArg) => ({ url: `/api/sessions/${queryArg.sessionId}/relink`, method: "POST" }),
+      query: (queryArg) => ({
+        url: `/api/sessions/${queryArg.sessionId}/relink`,
+        method: "POST",
+        body: queryArg.sessionRelinkRequest,
+      }),
     }),
     status: build.query<StatusApiResponse, StatusApiArg>({
       query: () => ({ url: `/api/linear/status` }),
@@ -71,6 +75,7 @@ export type RelinkApiResponse =
   /** status 200 Session attribution relinked */ SessionRelinkResponse;
 export type RelinkApiArg = {
   sessionId: string;
+  sessionRelinkRequest: SessionRelinkRequest;
 };
 export type StatusApiResponse = /** status 200 Linear integration status */ LinearStatusResponse;
 export type StatusApiArg = void;
@@ -182,6 +187,10 @@ export type SessionRelinkErrorResponse = {
     message: string;
     code: string;
   };
+};
+export type SessionRelinkRequest = {
+  /** Exact Linear issue identifier to link or relink. */
+  issueIdentifier: string;
 };
 export type RecordAttributionStatusNumber = {
   unlinked: number;

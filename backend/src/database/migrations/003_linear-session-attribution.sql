@@ -23,7 +23,7 @@ CREATE TABLE linear_session_attributions (
   resolution_status VARCHAR NOT NULL CHECK (
     resolution_status IN ('unlinked', 'unconfigured', 'pending', 'linked', 'not_found', 'error')
   ),
-  linear_id VARCHAR REFERENCES linear_issues(linear_id),
+  linear_id VARCHAR,
   last_attempt_at TIMESTAMP,
   last_success_at TIMESTAMP,
   failure_category VARCHAR CHECK (

@@ -87,17 +87,22 @@ curl -X POST http://127.0.0.1:3000/api/imports/rescan
 curl 'http://127.0.0.1:3000/api/sessions?limit=50&offset=0'
 curl http://127.0.0.1:3000/api/linear/status
 curl -X POST http://127.0.0.1:3000/api/linear/sync
-curl -X POST http://127.0.0.1:3000/api/sessions/<session-id>/relink
+curl -X POST http://127.0.0.1:3000/api/sessions/<session-id>/relink \
+  -H 'Content-Type: application/json' \
+  -d '{"issueIdentifier":"ENG-215"}'
 ```
 
-## Link the current Codex session
+## Link sessions by issue title
 
-The repository-scoped `$link-current-session` skill explicitly inspects the current Codex task and
-links it to the Linear issue in its title. Use titles in the form `ENG-215: phase`; the phase is
-optional and may be `explore`, `apply`, `verify`, or another short workflow label. The skill uses
-the host-provided stable task ID when available. If it is not available, it accepts only one safe
-repository-and-title discovery match; duplicate or missing matches never select by recency. In
-those cases, provide the exact session ID using the recovery command shown by the skill.
+The repository-scoped skill links every imported session whose title contains an issue identifier
+to that Linear issue. For example:
+
+```text
+Link all sessions with ENG-215 in the title to ENG-215.
+```
+
+The skill finds all exact title matches in AI Task Observer and links each session. It will not
+treat a longer identifier such as `ENG-2150` as a match for `ENG-215`.
 
 Start the development observer before invoking the skill:
 
@@ -105,11 +110,8 @@ Start the development observer before invoking the skill:
 npm run dev
 ```
 
-The observer URL defaults to `http://127.0.0.1:3000`. Override it with `AI_TASK_OBSERVER_URL` or
-the script's `--observer-url` option. The workflow first shows the imported title, candidate,
-phase, and committed issue. An unlinked valid candidate can proceed from the original explicit
-invocation; replacing a different committed issue requires a second explicit confirmation. A
-changed title, delayed import, invalid title, or unavailable observer stops without mutation.
+The observer URL defaults to `http://127.0.0.1:3000`; override it with `AI_TASK_OBSERVER_URL`. The
+backend resolves the supplied identifier exactly and atomically establishes or replaces each link.
 
 This workflow does not require MCP or a Linear plugin and never calls Linear itself. It communicates
 only with the observer, which remains the sole Linear client and DuckDB writer, so Linear
@@ -142,9 +144,10 @@ ENG-215: apply
 ENG-215: verify
 ```
 
-For an unlinked session, the issue identifier is eligible to establish the initial link. After
-that link succeeds, the stored issue remains authoritative until the user explicitly relinks
-the session. The text after the colon is optional metadata that can be used to break usage down
+For an unlinked session, the title identifier remains eligible for automatic initial attribution.
+After that link succeeds, the stored issue remains authoritative until the user explicitly
+relinks the session. Explicit relinking uses the authored request body and never derives its target
+from the title. The text after the colon is optional metadata that can be used to break usage down
 by workflow phase.
 
 Common phase examples are:
@@ -159,9 +162,10 @@ The phase is optional free-form metadata; it is not restricted to those examples
 must be at the start of the trimmed title and any suffix must use a colon, so `ENG-215 apply` and
 `work on ENG-215` remain unlinked. Renaming an unlinked session can establish its first link.
 Renaming a linked session to another identifier records a candidate for review but does not move
-or clear the stored link. Apply that candidate explicitly with
-`POST /api/sessions/{sessionId}/relink`; failed or stale relink attempts preserve the previous
-link and all imported usage facts.
+or clear the stored link. Apply a chosen identifier explicitly with
+`POST /api/sessions/{sessionId}/relink` and JSON body `{ "issueIdentifier": "ENG-215" }`;
+validation, missing-session, exact-lookup, or persistence failures preserve the previous link and
+all imported usage facts.
 
 Linear issue summaries are cached for one hour by default (`LINEAR_CACHE_TTL_MS`) and refreshed
 through startup or manual synchronization. Linked issues are refreshed by their stored identity,

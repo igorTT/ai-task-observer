@@ -1,78 +1,61 @@
-## 1. Skill Contract and Structure
+## 1. Authored API Contract
 
-- [x] 1.1 Create `.agents/skills/link-current-session/` with `SKILL.md`,
-  `agents/openai.yaml`, `scripts/`, and a mirrored `__tests__/scripts/` tree.
-- [x] 1.2 Configure the skill metadata for explicit-only `$link-current-session` invocation and
-  document its narrow purpose, required observer process, and prohibited direct data access.
-- [x] 1.3 Write the skill workflow to prefer host-provided current-task identity, fall back to
-  repository-and-title discovery only when unique, and stop for an explicit identifier on zero or
-  duplicate matches.
-- [x] 1.4 Define the skill's inspect, confirmation, link, and result-rendering steps, including the
-  rule that a differing committed issue link requires a second user confirmation.
+- [x] 1.1 Add a required relink request model containing a validated `issueIdentifier`.
+- [x] 1.2 Update the sessions controller relink operation to accept the path `sessionId` and request
+  body `issueIdentifier` as its only logical inputs.
+- [x] 1.3 Update authored success and error documentation for invalid identifiers, missing sessions,
+  exact Linear resolution failures, and preserved previous links.
 
-## 2. Deterministic Observer Script Foundation
+## 2. Backend Relink Behavior
 
-- [x] 2.1 Implement command and argument parsing for `inspect` and `link`, including required
-  session identity, expected candidate, and confirmed previous-link inputs.
-- [x] 2.2 Implement observer URL precedence from command argument, `AI_TASK_OBSERVER_URL`, and the
-  loopback default, with protocol, embedded-credential, and redirect-origin validation.
-- [x] 2.3 Implement the versioned structured result schema, stable outcome categories, stdout/stderr
-  separation, and documented exit status classes.
-- [x] 2.4 Add bounded request execution using Node's built-in `fetch`, abort timeouts, safe URL path
-  construction, and sanitized transport failure mapping.
-- [x] 2.5 Add narrow runtime validators for the consumed session detail, rescan, relink, and API
-  error payloads without copying complete backend models or importing generated files.
+- [x] 2.1 Change the coordinator and relink service signatures to accept an explicit issue
+  identifier.
+- [x] 2.2 Normalize and validate the supplied identifier, resolve it exactly through the existing
+  Linear reader, and reject identifier mismatches.
+- [x] 2.3 Remove current-title parsing and stale-title checks from explicit relinking while retaining
+  session-existence checks and automatic-attribution title safeguards.
+- [x] 2.4 Preserve the previous link on lookup or persistence failure and commit successful initial
+  links, replacements, and idempotent repeats atomically.
+- [x] 2.5 Add backend service and HTTP regression tests for initial link, replacement, idempotency,
+  invalid input, missing session, not found, mismatch, transient failure, and atomic preservation.
 
-## 3. Inspection and Ingestion Readiness
+## 3. Generated Contract and Frontend
 
-- [x] 3.1 Implement direct session inspection that returns imported title, candidate, phase,
-  committed issue summary, and stable session identity.
-- [x] 3.2 Implement bounded polling for an initially unknown session and continue without a rescan
-  when watcher ingestion completes in time.
-- [x] 3.3 Implement at most one explicit rescan followed by bounded polling, and return
-  `session_not_imported` when the selected identity remains unknown.
-- [x] 3.4 Classify inspection as `ready_to_link`, `already_linked`, `confirmation_required`, or
-  `invalid_title` without performing a relink mutation.
+- [x] 3.1 Run `npm run generate:api` to regenerate tsoa routes, OpenAPI, and the frontend RTK Query
+  client from the authored request model.
+- [x] 3.2 Update the sessions UI relink mutation to send its displayed candidate identifier
+  explicitly while retaining UI-level replacement confirmation.
+- [x] 3.3 Update frontend tests for the required mutation body and regenerated hook signature.
+- [x] 3.4 Verify generated artifacts are fresh and contain no unrelated manual edits.
 
-## 4. Safe Link and Relink Execution
+## 4. Skill Simplification
 
-- [x] 4.1 Re-inspect immediately before mutation and reject changed candidate or previous-link
-  expectations as `stale_preflight`.
-- [x] 4.2 Require a matching confirmed previous issue identifier when the current committed link
-  differs from the title candidate, while allowing an unlinked candidate to proceed from the
-  original explicit invocation.
-- [x] 4.3 Invoke the existing session relink endpoint with only the encoded stable session
-  identifier and report `linked` or `relinked` from the committed response.
-- [x] 4.4 Map unconfigured Linear, missing issue, stale title, retryable Linear failures, rejected
-  responses, and malformed observer responses to stable sanitized outcomes without automatic
-  mutation retries.
-- [x] 4.5 Ensure script inputs, outputs, and diagnostics cannot accept or expose Linear credentials,
-  raw response bodies, session messages, reasoning, or tool data.
+- [x] 4.1 Rewrite `SKILL.md` around explicit ticket input, host-provided current session identity,
+  one observer mutation, and concise API result rendering.
+- [x] 4.2 Remove title-based discovery, inspect/confirm/re-inspect orchestration, ingestion polling,
+  rescanning, custom outcome classification, and duplicate response validation.
+- [x] 4.3 Remove `scripts/link-current-session.mjs`, its state-machine test suite, and obsolete root
+  skill-test wiring.
+- [x] 4.4 Update the skill metadata prompt to show invocation with an explicit issue identifier.
 
-## 5. Automated Verification
+## 5. Documentation and Verification
 
-- [x] 5.1 Add Bun tests for command parsing, observer URL precedence and rejection, output schema,
-  exit statuses, encoded session paths, request timeouts, and redirect handling.
-- [x] 5.2 Add inspect tests for valid unlinked candidates, phases, already-linked sessions,
-  differing links, invalid titles, and malformed contract payloads.
-- [x] 5.3 Add readiness tests for watcher success before rescan, one coalesced rescan, exhaustion,
-  observer unavailability, non-404 API errors, and bounded retry counts using injected timing.
-- [x] 5.4 Add link tests for successful initial linking, confirmed replacement, missing or mismatched
-  confirmation, changed preflight state, stale backend title, and every documented Linear failure
-  class.
-- [x] 5.5 Add tests that assert duplicate-title skill guidance never selects by recency, metadata
-  disables implicit invocation, and emitted errors contain no fixture secrets or raw payloads.
-- [x] 5.6 Add a root `test:skills` command, include it in the existing root `test` and `verify`
-  paths, and keep Bun limited to test execution.
+- [x] 5.1 Update README examples to show the required relink body and
+  `$link-current-session ENG-215` invocation.
+- [x] 5.2 Document that explicit linking is independent of the session title while automatic initial
+  attribution may still use a valid title candidate.
+- [x] 5.3 Run formatting, linting, type checking, workspace tests, builds, smoke checks,
+  and strict OpenSpec validation.
+- [x] 5.4 Manually verify successful linking, replacement, idempotent repeat, missing ingestion,
+  unavailable observer, and preserved attribution after Linear failure using anonymized data.
 
-## 6. Documentation and End-to-End Validation
+## 6. DuckDB Multi-Session Link Correction
 
-- [x] 6.1 Document `$link-current-session`, the `ENG-215: phase` title convention, observer startup,
-  `AI_TASK_OBSERVER_URL`, explicit session-ID recovery, confirmation, and common failure guidance.
-- [x] 6.2 Document that the workflow requires no MCP or Linear plugin, never writes to Linear, and
-  can run against the development observer before Docker packaging is complete.
-- [x] 6.3 Validate the skill structure and explicit invocation metadata, then manually exercise a
-  unique current task, duplicate-title refusal, delayed import, already-linked no-op, and confirmed
-  relink against a local observer using anonymized data.
-- [x] 6.4 Run formatting, linting, type checking, skill tests, workspace tests, builds, smoke checks,
-  and strict OpenSpec validation; confirm no generated API or database artifacts changed.
+- [x] 6.1 Remove the `linear_session_attributions.linear_id` foreign key from the development
+  schema while preserving its index and attribution integrity checks.
+- [x] 6.2 Add repository and HTTP regressions that refresh an already-referenced issue and link two
+  distinct sessions to the same issue.
+- [x] 6.3 Add coordinator regression coverage for refreshing cached issue metadata after a link
+  exists.
+- [x] 6.4 Reset the development database, run focused backend verification, and complete strict
+  repository and OpenSpec validation.

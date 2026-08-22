@@ -183,8 +183,12 @@ test("active status polling stops after a terminal response", async ({ page }) =
 
 test("unlinked session requires confirmation and relinks once", async ({ page }) => {
   let relinks = 0;
+  let relinkBody: unknown;
   page.on("request", (request) => {
-    if (request.method() === "POST" && request.url().includes("/relink")) relinks += 1;
+    if (request.method() === "POST" && request.url().includes("/relink")) {
+      relinks += 1;
+      relinkBody = request.postDataJSON();
+    }
   });
   await page.goto("/sessions");
   await expectNoPageOverflow(page);
@@ -193,6 +197,7 @@ test("unlinked session requires confirmation and relinks once", async ({ page })
   await expectNoPageOverflow(page);
   await page.getByRole("button", { name: "Confirm link" }).click();
   await expect.poll(() => relinks).toBe(1);
+  expect(relinkBody).toEqual({ issueIdentifier: "ENG-1" });
 });
 
 test("operational failure is retained and can be retried", async ({ page }) => {

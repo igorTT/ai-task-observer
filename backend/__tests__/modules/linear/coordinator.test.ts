@@ -374,15 +374,20 @@ describe("AttributionCoordinator", () => {
     expect(calls).toEqual(["ENG-215"]);
 
     now = new Date("2026-08-09T10:00:02.000Z");
-    await opened.coordinator.sync();
+    const refresh = await opened.coordinator.sync();
     await waitForIdle(opened.coordinator);
     expect(calls).toEqual(["ENG-215", "ENG-215"]);
+    expect(await opened.runs.find(refresh.runId)).toMatchObject({ state: "completed" });
+    expect(await opened.issues.findById("id-ENG-215")).toMatchObject({
+      title: "Issue 2",
+      syncedAt: now,
+    });
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       candidateIdentifier: "ENG-216",
       linearId: "id-ENG-215",
     });
 
-    await opened.coordinator.relink("session-1");
+    await opened.coordinator.relink("session-1", "ENG-216");
     expect(calls).toEqual(["ENG-215", "ENG-215", "ENG-216"]);
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       status: "linked",

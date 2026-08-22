@@ -1,8 +1,20 @@
-import { Controller, Get, Path, Post, Query, Response, Route, SuccessResponse, Tags } from "tsoa";
+import {
+  Body,
+  Controller,
+  Get,
+  Path,
+  Post,
+  Query,
+  Response,
+  Route,
+  SuccessResponse,
+  Tags,
+} from "tsoa";
 
 import { apiDependencies } from "@/api/dependencies.js";
 import type {
   SessionRelinkErrorResponse,
+  SessionRelinkRequest,
   SessionRelinkResponse,
 } from "@/api/models/linear-response.js";
 import type {
@@ -34,12 +46,15 @@ export class SessionsController extends Controller {
   @Post("{sessionId}/relink")
   @SuccessResponse(200, "Session attribution relinked")
   @Response<SessionRelinkErrorResponse>(404, "Session or Linear issue not found")
-  @Response<SessionRelinkErrorResponse>(409, "Linear unconfigured or session title changed")
-  @Response<SessionRelinkErrorResponse>(422, "Current title has no Linear issue candidate")
-  @Response<SessionRelinkErrorResponse>(502, "Linear rejected the relink lookup")
-  @Response<SessionRelinkErrorResponse>(503, "Linear relink lookup temporarily unavailable")
-  public async relink(@Path() sessionId: string): Promise<SessionRelinkResponse> {
-    await apiDependencies().linear.relink(sessionId);
+  @Response<SessionRelinkErrorResponse>(409, "Linear integration is not configured")
+  @Response<SessionRelinkErrorResponse>(422, "Invalid Linear issue identifier")
+  @Response<SessionRelinkErrorResponse>(502, "Linear rejected or mismatched the exact lookup")
+  @Response<SessionRelinkErrorResponse>(503, "Linear exact lookup temporarily unavailable")
+  public async relink(
+    @Path() sessionId: string,
+    @Body() request: SessionRelinkRequest,
+  ): Promise<SessionRelinkResponse> {
+    await apiDependencies().linear.relink(sessionId, request.issueIdentifier);
     const session = await apiDependencies().sessions.find(sessionId);
     if (!session) throw new SessionNotFoundError();
     return { attribution: session.attribution };

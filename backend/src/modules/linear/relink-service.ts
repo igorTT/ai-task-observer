@@ -2,19 +2,15 @@ import type { AppDatabase } from "@/database/database.js";
 import type { CodexSessionRepository } from "@/database/repositories/codex-session-repository.js";
 import type { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
 import type { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
-import {
-  stateForCurrentTitle,
-  stateForLookupResult,
-  titleFingerprint,
-} from "@/modules/linear/attribution-state.js";
+import { titleFingerprint } from "@/modules/linear/attribution-state.js";
 import type {
   LinearFailureCategory,
   LinearIssueReader,
-  LinearLookupResult,
   SessionAttribution,
 } from "@/modules/linear/domain.js";
 import { LinearNotConfiguredError, SessionRelinkError } from "@/modules/linear/errors.js";
-import { parseSessionTitle } from "@/modules/linear/title-parser.js";
+
+const ISSUE_IDENTIFIER_PATTERN = /^([A-Za-z][A-Za-z0-9]*)-([1-9][0-9]*)$/u;
 
 export interface SessionRelinkServiceOptions {
   readonly database: AppDatabase;
@@ -42,31 +38,29 @@ export class SessionRelinkService {
     this.#now = options.now ?? (() => new Date());
   }
 
-  public async relink(sessionId: string): Promise<SessionAttribution> {
+  public async relink(sessionId: string, issueIdentifier: string): Promise<SessionAttribution> {
+    const normalizedIdentifier = normalizeIssueIdentifier(issueIdentifier);
+    if (!normalizedIdentifier) {
+      throw new SessionRelinkError(
+        422,
+        "linear_relink_invalid_identifier",
+        "The supplied Linear issue identifier is invalid",
+      );
+    }
     if (!this.#reader) throw new LinearNotConfiguredError();
     const session = await this.#sessions.findById(sessionId);
     if (!session) {
       throw new SessionRelinkError(404, "session_not_found", "Session was not found");
     }
-    const fingerprint = titleFingerprint(session.currentTitle);
-    const parsed = parseSessionTitle(session.currentTitle);
-    if (parsed.kind === "unlinked") {
-      throw new SessionRelinkError(
-        422,
-        "linear_relink_candidate_missing",
-        "The current session title does not contain a valid Linear issue candidate",
-      );
-    }
 
-    let result = await this.#reader.findIssue(parsed.candidateIdentifier);
+    let result = await this.#reader.findIssue(normalizedIdentifier);
     if (
       result.kind === "found" &&
-      result.issue.identifier.toUpperCase() !== parsed.candidateIdentifier
+      normalizeIssueIdentifier(result.issue.identifier) !== normalizedIdentifier
     ) {
       result = { kind: "error", category: "identifier_mismatch" };
     }
     if (result.kind !== "found") {
-      await this.#recordFailedAttempt(sessionId, fingerprint, result);
       throw relinkFailure(result);
     }
 
@@ -74,27 +68,25 @@ export class SessionRelinkService {
       await connection.run("BEGIN TRANSACTION");
       try {
         const currentSession = await this.#sessions.findById(sessionId);
-        const currentParsed = parseSessionTitle(currentSession?.currentTitle);
-        if (
-          !currentSession ||
-          titleFingerprint(currentSession.currentTitle) !== fingerprint ||
-          currentParsed.kind !== "candidate" ||
-          currentParsed.candidateIdentifier !== parsed.candidateIdentifier
-        ) {
-          throw new SessionRelinkError(
-            409,
-            "linear_relink_stale_title",
-            "The session title changed while the Linear issue was being resolved",
-          );
+        if (!currentSession) {
+          throw new SessionRelinkError(404, "session_not_found", "Session was not found");
         }
 
         const previous = await this.#attributions.findBySessionId(sessionId);
+        if (
+          previous?.status === "linked" &&
+          previous.linearId === result.issue.linearId &&
+          previous.candidateIdentifier === normalizedIdentifier
+        ) {
+          await connection.run("COMMIT");
+          return previous;
+        }
         const now = this.#now();
         const linked: SessionAttribution & { readonly linearId: string } = {
           sessionId,
-          titleFingerprint: fingerprint,
-          candidateIdentifier: currentParsed.candidateIdentifier,
-          ...(currentParsed.phase ? { phase: currentParsed.phase } : {}),
+          titleFingerprint: titleFingerprint(currentSession.currentTitle),
+          candidateIdentifier: normalizedIdentifier,
+          ...(previous?.phase ? { phase: previous.phase } : {}),
           status: "linked",
           linearId: result.issue.linearId,
           lastAttemptAt: now,
@@ -112,54 +104,32 @@ export class SessionRelinkService {
       }
     });
   }
-
-  async #recordFailedAttempt(
-    sessionId: string,
-    fingerprint: string,
-    result: Exclude<LinearLookupResult, { readonly kind: "found" }>,
-  ): Promise<void> {
-    await this.#database.exclusiveWrite(async (connection) => {
-      await connection.run("BEGIN TRANSACTION");
-      try {
-        const session = await this.#sessions.findById(sessionId);
-        if (!session || titleFingerprint(session.currentTitle) !== fingerprint) {
-          await connection.run("COMMIT");
-          return;
-        }
-        const previous = await this.#attributions.findBySessionId(sessionId);
-        const current = stateForCurrentTitle({
-          sessionId,
-          ...(session.currentTitle ? { title: session.currentTitle } : {}),
-          configured: true,
-          ...(previous ? { previous } : {}),
-          now: this.#now(),
-        });
-        await this.#attributions.save(stateForLookupResult(current, result, this.#now()));
-        await connection.run("COMMIT");
-      } catch (error) {
-        await rollback(connection);
-        throw error;
-      }
-    });
-  }
 }
 
 function relinkFailure(
-  result: Exclude<LinearLookupResult, { readonly kind: "found" }>,
+  result:
+    | { readonly kind: "not_found" }
+    | { readonly kind: "error"; readonly category: LinearFailureCategory },
 ): SessionRelinkError {
   if (result.kind === "not_found") {
     return new SessionRelinkError(
       404,
       "linear_relink_not_found",
-      "The current Linear issue candidate was not found or is inaccessible",
+      "The requested Linear issue was not found or is inaccessible",
     );
   }
   return new SessionRelinkError(
     failureStatus(result.category),
     `linear_relink_${result.category}`,
-    "The current Linear issue candidate could not be resolved",
+    "The requested Linear issue could not be resolved",
     result.category,
   );
+}
+
+function normalizeIssueIdentifier(identifier: string): string | undefined {
+  const match = ISSUE_IDENTIFIER_PATTERN.exec(identifier);
+  if (!match?.[1] || !match[2]) return undefined;
+  return `${match[1].toUpperCase()}-${match[2]}`;
 }
 
 function failureStatus(category: LinearFailureCategory): number {

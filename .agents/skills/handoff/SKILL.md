@@ -1,59 +1,41 @@
 ---
 name: handoff
-description: Create a fresh Codex task in the current worktree with a preassigned title when the user explicitly requests a task handoff.
+description: Create a fresh Codex task in the exact current worktree when the user explicitly requests a task handoff, preserving any supplied title or model settings.
 ---
 
 # Same-Worktree Handoff
 
-Create a fresh Codex task in the current repository and working tree, give it the exact title
-requested by the user, and pass it a focused prompt containing the task context.
+Use only when the user explicitly asks to create or hand off a task. The child runs in the exact
+current checkout; the parent does not perform the handed-off work.
 
-Use this skill only after the user explicitly asks to hand off, start, or create a new task. It
-creates the child task but does not perform the handed-off work in the calling task.
+## Create the task
 
-## Prepare the handoff
+1. Preserve a supplied title exactly. If none is supplied, omit `title` and let task creation use
+   its default; do not ask for or derive one.
+2. Preserve any explicit model and reasoning choices. If either is not supplied, omit its field so
+   task creation uses the selected default. Resolve an unambiguous short model name
+   against the models advertised by `codex_app__create_thread` (for example, `sol` to the unique
+   available `*-sol` model ID). Model and reasoning are separate fields: never substitute one for
+   the other. If a requested value is unavailable or ambiguous, ask instead of silently changing it.
+3. Call `codex_app__list_projects`, select the Git project whose path is the current repository,
+   then call `codex_app__create_thread` with:
 
-1. Identify the preassigned title and the task to perform. Preserve the user's title exactly,
-   including prefixes such as `Apply:`. If the user asks for a handoff without providing a title,
-   derive a concise title from an unambiguous request; otherwise ask for the title.
-2. Carry forward the user's requirements, relevant findings and decisions, constraints, and any
-   explicitly requested model or reasoning level. Do not add unrelated scope.
-3. Before creating a project task, call `codex_app__list_projects` and select the project whose path
-   is the current repository. Confirm that it is a Git repository.
+   - the exact title only when supplied;
+   - target type `project` and the selected project ID;
+   - `environment: { type: "local" }`.
 
-## Create the same-worktree task
+   Do not use `environment: { type: "worktree" }`: that creates a separate checkout, including when
+   `startingState` is `working-tree`. If local execution in the selected directory is unavailable,
+   stop and report it.
+4. Give the child the task, relevant decisions and constraints, and instructions to inspect the
+   repository and working tree, preserve unrelated changes, use the appropriate workflow, verify
+   its work, and report blockers. Tell it not to create another handoff or archive anything unless
+   requested.
 
-Use `codex_app__create_thread`, not a fork of the current task, with:
+## Report
 
-- target type `project`;
-- the selected project ID;
-- local environment;
-- `startingState: { type: "working-tree" }`, so current uncommitted changes are visible;
-- the exact preassigned title.
-
-Pass through a model or reasoning setting only when the user explicitly requested it; otherwise
-use the configured default.
-
-The child prompt must include the task request and relevant context, and instruct the child to:
-
-- inspect the repository instructions and current working tree before editing;
-- complete the requested task using the appropriate workflow or skill;
-- preserve unrelated user changes and follow generated-file and verification rules;
-- run focused verification appropriate to the task and report what was checked;
-- stop and report if blocked or if the request requires clarification or a planning revision;
-- not create another handoff; and
-- not archive changes or tasks unless that is explicitly part of the request.
-
-## Confirm and report
-
-After creation, use `codex_app__wait_threads` with `timeoutMs: 0` for an immediate status snapshot.
-If a ready `threadId` is returned, report it with:
-
-`::created-thread{threadId="<thread-id>"}`
-
-If setup returns only a `clientThreadId`, report that the task is queued and do not pass it to
-thread tools that require a ready `threadId`. Include the title, task summary, repository path,
-and that the working tree is shared.
-
-The parent task should not perform the handed-off work. Wait for a new user request before doing
-additional work in the parent.
+If creation returns a `threadId`, call `codex_app__wait_threads` with `timeoutMs: 0`, then emit
+`::created-thread{threadId="<thread-id>"}`. If it returns only a `clientThreadId`, report that the
+task is queued and do not pass that ID to thread tools. Include the title, task summary, repository
+path, and that the exact working tree is shared. Omit the title from the report when task creation
+used its default and did not return one.

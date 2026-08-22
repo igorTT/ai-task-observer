@@ -354,6 +354,20 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"SessionRelinkRequest": {
+				"properties": {
+					"issueIdentifier": {
+						"type": "string",
+						"description": "Exact Linear issue identifier to link or relink.",
+						"pattern": "^[A-Za-z][A-Za-z0-9]*-[1-9][0-9]*$"
+					}
+				},
+				"required": [
+					"issueIdentifier"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"Record_AttributionStatus.number_": {
 				"properties": {
 					"unlinked": {
@@ -1305,7 +1319,7 @@
 						}
 					},
 					"409": {
-						"description": "Linear unconfigured or session title changed",
+						"description": "Linear integration is not configured",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1315,7 +1329,7 @@
 						}
 					},
 					"422": {
-						"description": "Current title has no Linear issue candidate",
+						"description": "Invalid Linear issue identifier",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1325,7 +1339,7 @@
 						}
 					},
 					"502": {
-						"description": "Linear rejected the relink lookup",
+						"description": "Linear rejected or mismatched the exact lookup",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1335,7 +1349,7 @@
 						}
 					},
 					"503": {
-						"description": "Linear relink lookup temporarily unavailable",
+						"description": "Linear exact lookup temporarily unavailable",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1358,7 +1372,17 @@
 							"type": "string"
 						}
 					}
-				]
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SessionRelinkRequest"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/api/linear/status": {

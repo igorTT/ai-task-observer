@@ -24,11 +24,7 @@ export default tseslint.config(
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            ".agents/skills/link-current-session/__tests__/scripts/link-current-session.test.ts",
-          ],
-        },
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -73,14 +69,5 @@ export default tseslint.config(
   {
     files: ["**/*.js", "**/*.mjs"],
     languageOptions: { globals: globals.node },
-  },
-  {
-    files: [".agents/skills/link-current-session/__tests__/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/require-await": "off",
-    },
   },
 );

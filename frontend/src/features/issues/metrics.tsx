@@ -1,14 +1,20 @@
 import type { UsageMetricsResponse } from "@/api/generated/api";
 import { Badge } from "@/components/ui/badge";
-import { formatCode, formatDecimalCount, formatNullableCount, formatUsd } from "@/lib/formatters";
+import {
+  formatCode,
+  formatCompactTokenCount,
+  formatDecimalCount,
+  formatNullableCount,
+  formatUsd,
+} from "@/lib/formatters";
 
 const fields: Array<[keyof UsageMetricsResponse, string, (value: string | null) => string]> = [
   ["sessionCount", "Sessions", formatNullableCount],
   ["developerTurns", "Developer turns", formatNullableCount],
-  ["inputTokens", "Input tokens", formatNullableCount],
-  ["cachedInputTokens", "Cached input (included)", formatNullableCount],
-  ["outputTokens", "Output tokens", formatNullableCount],
-  ["totalTokens", "Total tokens", formatNullableCount],
+  ["inputTokens", "Input tokens", formatCompactTokenCount],
+  ["cachedInputTokens", "Cached input (included)", formatCompactTokenCount],
+  ["outputTokens", "Output tokens", formatCompactTokenCount],
+  ["totalTokens", "Total tokens", formatCompactTokenCount],
   ["estimatedCostUsd", "Estimated cost", formatUsd],
 ];
 
@@ -48,7 +54,7 @@ export function CompactMetrics({ metrics }: { metrics: UsageMetricsResponse }) {
   return (
     <span>
       {formatDecimalCount(metrics.sessionCount)} sessions ·{" "}
-      {formatNullableCount(metrics.totalTokens)} tokens · {formatUsd(metrics.estimatedCostUsd)}
+      {formatCompactTokenCount(metrics.totalTokens)} tokens · {formatUsd(metrics.estimatedCostUsd)}
     </span>
   );
 }

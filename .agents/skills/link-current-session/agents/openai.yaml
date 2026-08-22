@@ -1,7 +1,7 @@
 interface:
-  display_name: "Link Current Session"
-  short_description: "Link the current Codex task to its title issue"
-  default_prompt: "Use $link-current-session to inspect and link this Codex task."
+  display_name: "Link Matching Sessions"
+  short_description: "Link title-matching sessions to a Linear issue"
+  default_prompt: "Use $link-current-session to link every session with ENG-215 in its title to ENG-215."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
