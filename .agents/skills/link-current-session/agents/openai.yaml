@@ -1,0 +1,7 @@
+interface:
+  display_name: "Link Current Session"
+  short_description: "Link the current Codex task to its title issue"
+  default_prompt: "Use $link-current-session to inspect and link this Codex task."
+
+policy:
+  allow_implicit_invocation: false
