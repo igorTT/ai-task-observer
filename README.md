@@ -90,6 +90,32 @@ curl -X POST http://127.0.0.1:3000/api/linear/sync
 curl -X POST http://127.0.0.1:3000/api/sessions/<session-id>/relink
 ```
 
+## Link the current Codex session
+
+The repository-scoped `$link-current-session` skill explicitly inspects the current Codex task and
+links it to the Linear issue in its title. Use titles in the form `ENG-215: phase`; the phase is
+optional and may be `explore`, `apply`, `verify`, or another short workflow label. The skill uses
+the host-provided stable task ID when available. If it is not available, it accepts only one safe
+repository-and-title discovery match; duplicate or missing matches never select by recency. In
+those cases, provide the exact session ID using the recovery command shown by the skill.
+
+Start the development observer before invoking the skill:
+
+```bash
+npm run dev
+```
+
+The observer URL defaults to `http://127.0.0.1:3000`. Override it with `AI_TASK_OBSERVER_URL` or
+the script's `--observer-url` option. The workflow first shows the imported title, candidate,
+phase, and committed issue. An unlinked valid candidate can proceed from the original explicit
+invocation; replacing a different committed issue requires a second explicit confirmation. A
+changed title, delayed import, invalid title, or unavailable observer stops without mutation.
+
+This workflow does not require MCP or a Linear plugin and never calls Linear itself. It communicates
+only with the observer, which remains the sole Linear client and DuckDB writer, so Linear
+credentials must be configured on the observer rather than passed to the skill. It can be used
+against the development observer before Docker packaging is complete.
+
 The internal POC persists stable session metadata, accounting facts, checkpoints, and selected
 explicit user/assistant message events. Message content remains local and is never returned by the
 session APIs. Reasoning, tool arguments/results, credentials, opaque raw records, and malformed
