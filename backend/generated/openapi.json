@@ -7,6 +7,242 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
+			"UsageTimelineRangeResponse": {
+				"type": "string",
+				"enum": [
+					"12h",
+					"24h"
+				]
+			},
+			"UsageTimelineBucketUnitResponse": {
+				"type": "string",
+				"enum": [
+					"hour"
+				],
+				"nullable": false
+			},
+			"UsageTimelineCompletenessState": {
+				"type": "string",
+				"enum": [
+					"complete",
+					"partial",
+					"unavailable"
+				]
+			},
+			"UsageTimelineCompletenessResponse": {
+				"properties": {
+					"token": {
+						"$ref": "#/components/schemas/UsageTimelineCompletenessState"
+					},
+					"cost": {
+						"$ref": "#/components/schemas/UsageTimelineCompletenessState"
+					}
+				},
+				"required": [
+					"token",
+					"cost"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UsageTimelineTotalsResponse": {
+				"properties": {
+					"totalTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"estimatedCostUsd": {
+						"type": "string",
+						"nullable": true
+					},
+					"tokenComplete": {
+						"type": "boolean"
+					},
+					"costComplete": {
+						"type": "boolean"
+					},
+					"completeness": {
+						"$ref": "#/components/schemas/UsageTimelineCompletenessResponse"
+					},
+					"warnings": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"totalTokens",
+					"estimatedCostUsd",
+					"tokenComplete",
+					"costComplete",
+					"completeness",
+					"warnings"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UsageTimelineBucketResponse": {
+				"properties": {
+					"totalTokens": {
+						"type": "string",
+						"nullable": true
+					},
+					"estimatedCostUsd": {
+						"type": "string",
+						"nullable": true
+					},
+					"tokenComplete": {
+						"type": "boolean"
+					},
+					"costComplete": {
+						"type": "boolean"
+					},
+					"completeness": {
+						"$ref": "#/components/schemas/UsageTimelineCompletenessResponse"
+					},
+					"warnings": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"startAt": {
+						"type": "string"
+					},
+					"endAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"totalTokens",
+					"estimatedCostUsd",
+					"tokenComplete",
+					"costComplete",
+					"completeness",
+					"warnings",
+					"startAt",
+					"endAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UsageTimelineCoverageResponse": {
+				"type": "string",
+				"enum": [
+					"current",
+					"stale",
+					"missing"
+				]
+			},
+			"CostGenerationIdentityResponse": {
+				"properties": {
+					"generationId": {
+						"type": "string"
+					},
+					"sourceFactRevision": {
+						"type": "string"
+					},
+					"pricingCatalogVersion": {
+						"type": "string"
+					},
+					"pricingContentHash": {
+						"type": "string"
+					},
+					"calculatorVersion": {
+						"type": "string"
+					},
+					"completedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"generationId",
+					"sourceFactRevision",
+					"pricingCatalogVersion",
+					"pricingContentHash",
+					"calculatorVersion",
+					"completedAt"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UsageTimelineResponse": {
+				"properties": {
+					"range": {
+						"$ref": "#/components/schemas/UsageTimelineRangeResponse"
+					},
+					"bucketUnit": {
+						"$ref": "#/components/schemas/UsageTimelineBucketUnitResponse"
+					},
+					"startAt": {
+						"type": "string"
+					},
+					"endAt": {
+						"type": "string"
+					},
+					"totals": {
+						"$ref": "#/components/schemas/UsageTimelineTotalsResponse"
+					},
+					"buckets": {
+						"items": {
+							"$ref": "#/components/schemas/UsageTimelineBucketResponse"
+						},
+						"type": "array"
+					},
+					"unknownTimeObservationCount": {
+						"type": "string"
+					},
+					"costCoverage": {
+						"$ref": "#/components/schemas/UsageTimelineCoverageResponse"
+					},
+					"latestCompletedCostGeneration": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/CostGenerationIdentityResponse"
+							}
+						],
+						"nullable": true
+					}
+				},
+				"required": [
+					"range",
+					"bucketUnit",
+					"startAt",
+					"endAt",
+					"totals",
+					"buckets",
+					"unknownTimeObservationCount",
+					"costCoverage",
+					"latestCompletedCostGeneration"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"ErrorResponse": {
+				"properties": {
+					"error": {
+						"properties": {
+							"message": {
+								"type": "string"
+							},
+							"code": {
+								"type": "string"
+							}
+						},
+						"required": [
+							"message",
+							"code"
+						],
+						"type": "object"
+					}
+				},
+				"required": [
+					"error"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"HealthResponse": {
 				"properties": {
 					"status": {
@@ -60,6 +296,18 @@
 					"linked",
 					"not_found",
 					"error"
+				]
+			},
+			"SessionPhase": {
+				"type": "string",
+				"enum": [
+					"research",
+					"explore",
+					"proposal",
+					"apply",
+					"verify",
+					"quick-flow",
+					"other"
 				]
 			},
 			"LinearIssueResponse": {
@@ -151,7 +399,7 @@
 						"type": "string"
 					},
 					"phase": {
-						"type": "string"
+						"$ref": "#/components/schemas/SessionPhase"
 					},
 					"issue": {
 						"$ref": "#/components/schemas/LinearIssueResponse"
@@ -225,6 +473,19 @@
 						"type": "string",
 						"nullable": true
 					},
+					"estimatedCostUsd": {
+						"type": "string",
+						"nullable": true
+					},
+					"costComplete": {
+						"type": "boolean"
+					},
+					"pricingGapCodes": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
 					"usageObserved": {
 						"type": "boolean"
 					},
@@ -252,6 +513,9 @@
 					"uncachedInputTokens",
 					"outputTokens",
 					"totalTokens",
+					"estimatedCostUsd",
+					"costComplete",
+					"pricingGapCodes",
 					"usageObserved",
 					"tokenCompleteness",
 					"usageAnomalies",
@@ -287,30 +551,6 @@
 					"total",
 					"limit",
 					"offset"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
-			"ErrorResponse": {
-				"properties": {
-					"error": {
-						"properties": {
-							"message": {
-								"type": "string"
-							},
-							"code": {
-								"type": "string"
-							}
-						},
-						"required": [
-							"message",
-							"code"
-						],
-						"type": "object"
-					}
-				},
-				"required": [
-					"error"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -364,6 +604,36 @@
 				},
 				"required": [
 					"issueIdentifier"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SessionPhaseResponse": {
+				"properties": {
+					"attribution": {
+						"$ref": "#/components/schemas/SessionAttributionResponse"
+					}
+				},
+				"required": [
+					"attribution"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"SessionPhaseRequest": {
+				"properties": {
+					"phase": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/SessionPhase"
+							}
+						],
+						"nullable": true,
+						"description": "Canonical phase to assign, or null to clear the explicit assignment."
+					}
+				},
+				"required": [
+					"phase"
 				],
 				"type": "object",
 				"additionalProperties": false
@@ -643,38 +913,6 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"CostGenerationIdentityResponse": {
-				"properties": {
-					"generationId": {
-						"type": "string"
-					},
-					"sourceFactRevision": {
-						"type": "string"
-					},
-					"pricingCatalogVersion": {
-						"type": "string"
-					},
-					"pricingContentHash": {
-						"type": "string"
-					},
-					"calculatorVersion": {
-						"type": "string"
-					},
-					"completedAt": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"generationId",
-					"sourceFactRevision",
-					"pricingCatalogVersion",
-					"pricingContentHash",
-					"calculatorVersion",
-					"completedAt"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"IssueUsageModelResponse": {
 				"properties": {
 					"model": {
@@ -709,7 +947,11 @@
 						"nullable": true
 					},
 					"phase": {
-						"type": "string",
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/SessionPhase"
+							}
+						],
 						"nullable": true
 					},
 					"importState": {
@@ -1188,6 +1430,48 @@
 		"contact": {}
 	},
 	"paths": {
+		"/api/usage/timeline": {
+			"get": {
+				"operationId": "Timeline",
+				"responses": {
+					"200": {
+						"description": "Usage timeline",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/UsageTimelineResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Unsupported usage range",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Returns global committed usage in a supported rolling range.",
+				"tags": [
+					"Usage timeline"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "range",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
 		"/api/health": {
 			"get": {
 				"operationId": "GetHealth",
@@ -1379,6 +1663,67 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/SessionRelinkRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/sessions/{sessionId}/phase": {
+			"put": {
+				"operationId": "SetPhase",
+				"responses": {
+					"200": {
+						"description": "Session phase updated",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionPhaseResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Session not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"422": {
+						"description": "Invalid session phase",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Sessions"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "sessionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SessionPhaseRequest"
 							}
 						}
 					}

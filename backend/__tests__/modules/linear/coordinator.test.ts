@@ -11,6 +11,7 @@ import { CodexIngestionRepository } from "@/database/repositories/codex-ingestio
 import { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
 import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
 import { LinearSyncRunRepository } from "@/database/repositories/linear-sync-run-repository.js";
+import { SessionPhaseAssignmentRepository } from "@/database/repositories/session-phase-assignment-repository.js";
 import { AttributionCoordinator } from "@/modules/linear/coordinator.js";
 import type { LinearIssueReader, LinearLookupResult } from "@/modules/linear/domain.js";
 
@@ -45,6 +46,7 @@ async function setup(
     await ingestion.usage.replaceTokens(sessionId, { input: 10n, cachedInput: 2n, output: 3n });
   }
   const attributions = new LinearSessionAttributionRepository(database.connection);
+  const phases = new SessionPhaseAssignmentRepository(database.connection);
   const issues = new LinearIssueRepository(database.connection);
   const runs = new LinearSyncRunRepository(database.connection);
   const coordinator = new AttributionCoordinator({
@@ -59,7 +61,7 @@ async function setup(
     maxConcurrency: options.maxConcurrency ?? 2,
     ...(options.now ? { now: options.now } : {}),
   });
-  return { database, ingestion, attributions, issues, runs, coordinator };
+  return { database, ingestion, attributions, phases, issues, runs, coordinator };
 }
 
 function found(identifier: string, title = "Issue"): LinearLookupResult {
@@ -135,13 +137,14 @@ describe("AttributionCoordinator", () => {
       },
       2,
     );
+    await opened.phases.upsert("session-1", "research");
     await opened.coordinator.notifySessions(["session-1"]);
     release();
     await waitForIdle(opened.coordinator);
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       status: "linked",
       candidateIdentifier: "ENG-2",
-      phase: "apply",
+      linearId: "id-ENG-2",
     });
     expect(await opened.ingestion.usage.findBySessionId("session-1")).toMatchObject({
       totalTokens: 13n,
@@ -153,6 +156,7 @@ describe("AttributionCoordinator", () => {
     const opened = await setup(["ENG-1: apply"], {
       findIssue: (identifier) => Promise.resolve(found(identifier)),
     });
+    await opened.phases.upsert("session-1", "explore");
     await opened.coordinator.start();
     await waitForIdle(opened.coordinator);
     const before = await opened.ingestion.usage.findBySessionId("session-1");
@@ -166,9 +170,9 @@ describe("AttributionCoordinator", () => {
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       status: "linked",
       candidateIdentifier: "ENG-2",
-      phase: "verify",
       linearId: "id-ENG-1",
     });
+    expect(await opened.phases.findBySessionId("session-1")).toMatchObject({ phase: "explore" });
     expect(await opened.ingestion.usage.findBySessionId("session-1")).toMatchObject({
       inputTokens: before?.inputTokens,
       totalTokens: before?.totalTokens,
@@ -316,6 +320,7 @@ describe("AttributionCoordinator", () => {
         return Promise.resolve(found(identifier));
       },
     });
+    await opened.phases.upsert("session-1", "explore");
     await opened.coordinator.start();
     await waitForIdle(opened.coordinator);
 
@@ -340,8 +345,8 @@ describe("AttributionCoordinator", () => {
     expect(calls).toEqual(["ENG-215"]);
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       candidateIdentifier: "ENG-215",
-      phase: "verify",
     });
+    expect(await opened.phases.findBySessionId("session-1")).toMatchObject({ phase: "explore" });
     await opened.coordinator.close();
   });
 
@@ -358,6 +363,7 @@ describe("AttributionCoordinator", () => {
       },
       { now: () => now, cacheTtlMs: 1_000 },
     );
+    await opened.phases.upsert("session-1", "apply");
     await opened.coordinator.start();
     await waitForIdle(opened.coordinator);
     await opened.ingestion.sessions.upsert(
@@ -392,9 +398,9 @@ describe("AttributionCoordinator", () => {
     expect(await opened.attributions.findBySessionId("session-1")).toMatchObject({
       status: "linked",
       candidateIdentifier: "ENG-216",
-      phase: "apply",
       linearId: "id-ENG-216",
     });
+    expect(await opened.phases.findBySessionId("session-1")).toMatchObject({ phase: "apply" });
     await opened.coordinator.close();
   });
 });

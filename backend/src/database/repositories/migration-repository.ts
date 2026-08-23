@@ -20,7 +20,7 @@ export class MigrationRepository {
   public async findAll(): Promise<MigrationRecord[]> {
     if (!(await this.ledgerExists())) return [];
     const reader = await this.connection.runAndReadAll(
-      "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version",
+      "SELECT version, name, checksum, CAST(applied_at AS TIMESTAMPTZ) AS applied_at FROM schema_migrations ORDER BY version",
     );
     return (reader.getRowObjects() as unknown as MigrationRow[]).map(mapMigrationRow);
   }

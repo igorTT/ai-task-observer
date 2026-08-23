@@ -1,0 +1,9 @@
+{"timestamp":"2026-08-01T10:00:00.000Z","type":"session_meta","payload":{"id":"item-completed-user-turns","title":"SYNTHETIC-1: apply"}}
+{"timestamp":"2026-08-01T10:00:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"SYNTHETIC_LEGACY_USER"}}
+{"timestamp":"2026-08-01T10:00:02.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-user-item","type":"UserMessage","content":[{"type":"text","text":"SYNTHETIC_CURRENT_USER"},{"type":"input_text","text":"SYNTHETIC_UNSUPPORTED_INPUT"}]}}}
+{"timestamp":"2026-08-01T10:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"SYNTHETIC_MIRRORED_USER"}]}}
+{"timestamp":"2026-08-01T10:00:03.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-agent-item","type":"AgentMessage","content":[{"type":"text","text":"SYNTHETIC_NON_USER_COMPLETED"}]}}}
+{"timestamp":"2026-08-01T10:00:04.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-unsupported-user-item","type":"UserMessage","content":[{"type":"input_text","text":"SYNTHETIC_UNSUPPORTED_USER_CONTENT"}]}}}
+{"timestamp":"2026-08-01T10:00:05.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-malformed-user-item","type":"UserMessage","content":"SYNTHETIC_MALFORMED_USER_CONTENT"}}}
+{"timestamp":"2026-08-01T10:00:06.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-missing-content-item","type":"UserMessage"}}}
+{"timestamp":"2026-08-01T10:00:07.000Z","type":"event_msg","payload":{"type":"item_completed","item":{"id":"synthetic-wrong-case-item","type":"userMessage","content":[{"type":"text","text":"SYNTHETIC_WRONG_CASE_USER"}]}}}

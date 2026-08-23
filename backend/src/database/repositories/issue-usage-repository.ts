@@ -31,7 +31,7 @@ const COMMON_CTES = `
       i.url AS issue_url,
       s.session_id,
       s.current_title AS session_title,
-      a.phase,
+      p.phase,
       s.import_state,
       s.last_error,
       s.started_at,
@@ -39,6 +39,7 @@ const COMMON_CTES = `
     FROM linear_session_attributions a
     JOIN codex_sessions s ON s.session_id = a.session_id
     JOIN linear_issues i ON i.linear_id = a.linear_id
+    LEFT JOIN session_phase_assignments p ON p.session_id = a.session_id
     WHERE a.resolution_status = 'linked' AND a.linear_id IS NOT NULL
   ),
   usage_facts AS (
@@ -294,7 +295,7 @@ export class IssueUsageRepository {
       activities AS (
         SELECT
           session_id,
-          cast(event_time AS DATE) AS activity_date,
+          cast(event_time AT TIME ZONE 'UTC' AS DATE) AS activity_date,
           1::BIGINT AS developer_turns,
           false AS is_observation,
           NULL::BIGINT AS input_tokens,
@@ -312,7 +313,7 @@ export class IssueUsageRepository {
         UNION ALL
         SELECT
           session_id,
-          cast(observation_time AS DATE),
+          cast(observation_time AT TIME ZONE 'UTC' AS DATE),
           0::BIGINT,
           true,
           normalized_input,

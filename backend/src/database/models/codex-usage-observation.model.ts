@@ -1,3 +1,6 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapNullableTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type {
   NormalizationMethod,
   UsageAnomalyCode,
@@ -12,7 +15,7 @@ export interface CodexUsageObservationRow {
   readonly source_record_number: bigint;
   readonly parser_version: number;
   readonly model: string;
-  readonly event_time: Date | null;
+  readonly event_time: DuckDBTimestampTZValue | null;
   readonly raw_cumulative_input: bigint | null;
   readonly raw_cumulative_cached_input: bigint | null;
   readonly raw_cumulative_output: bigint | null;
@@ -40,7 +43,7 @@ export function mapUsageObservationRow(row: CodexUsageObservationRow): UsageObse
     sourceRecordNumber: BigInt(row.source_record_number),
     parserVersion: Number(row.parser_version),
     model: row.model,
-    eventTime: row.event_time === null ? null : new Date(row.event_time),
+    eventTime: mapNullableTimestampWithTimeZone(row.event_time),
     rawCumulative: rawCounters(
       row.raw_cumulative_input,
       row.raw_cumulative_cached_input,

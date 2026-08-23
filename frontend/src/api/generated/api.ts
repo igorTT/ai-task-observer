@@ -1,6 +1,14 @@
 import { baseApi as api } from "../base-api";
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
+    timeline: build.query<TimelineApiResponse, TimelineApiArg>({
+      query: (queryArg) => ({
+        url: `/api/usage/timeline`,
+        params: {
+          range: queryArg.range,
+        },
+      }),
+    }),
     getHealth: build.query<GetHealthApiResponse, GetHealthApiArg>({
       query: () => ({ url: `/api/health` }),
     }),
@@ -21,6 +29,13 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/sessions/${queryArg.sessionId}/relink`,
         method: "POST",
         body: queryArg.sessionRelinkRequest,
+      }),
+    }),
+    setPhase: build.mutation<SetPhaseApiResponse, SetPhaseApiArg>({
+      query: (queryArg) => ({
+        url: `/api/sessions/${queryArg.sessionId}/phase`,
+        method: "PUT",
+        body: queryArg.sessionPhaseRequest,
       }),
     }),
     status: build.query<StatusApiResponse, StatusApiArg>({
@@ -60,6 +75,10 @@ const injectedRtkApi = api.injectEndpoints({
   overrideExisting: false,
 });
 export { injectedRtkApi as generatedApi };
+export type TimelineApiResponse = /** status 200 Usage timeline */ UsageTimelineResponse;
+export type TimelineApiArg = {
+  range?: string;
+};
 export type GetHealthApiResponse = /** status 200 Healthy */ HealthResponse;
 export type GetHealthApiArg = void;
 export type ListApiResponse = /** status 200 Session page */ SessionPageResponse;
@@ -76,6 +95,11 @@ export type RelinkApiResponse =
 export type RelinkApiArg = {
   sessionId: string;
   sessionRelinkRequest: SessionRelinkRequest;
+};
+export type SetPhaseApiResponse = /** status 200 Session phase updated */ SessionPhaseResponse;
+export type SetPhaseApiArg = {
+  sessionId: string;
+  sessionPhaseRequest: SessionPhaseRequest;
 };
 export type StatusApiResponse = /** status 200 Linear integration status */ LinearStatusResponse;
 export type StatusApiArg = void;
@@ -100,6 +124,57 @@ export type CostCalculationStatusApiResponse =
 export type CostCalculationStatusApiArg = void;
 export type RecalculateCostsApiResponse = /** status 202 Accepted */ RecalculateCostResponse;
 export type RecalculateCostsApiArg = void;
+export type UsageTimelineRangeResponse = "12h" | "24h";
+export type UsageTimelineBucketUnitResponse = "hour";
+export type UsageTimelineCompletenessState = "complete" | "partial" | "unavailable";
+export type UsageTimelineCompletenessResponse = {
+  token: UsageTimelineCompletenessState;
+  cost: UsageTimelineCompletenessState;
+};
+export type UsageTimelineTotalsResponse = {
+  totalTokens: string | null;
+  estimatedCostUsd: string | null;
+  tokenComplete: boolean;
+  costComplete: boolean;
+  completeness: UsageTimelineCompletenessResponse;
+  warnings: string[];
+};
+export type UsageTimelineBucketResponse = {
+  totalTokens: string | null;
+  estimatedCostUsd: string | null;
+  tokenComplete: boolean;
+  costComplete: boolean;
+  completeness: UsageTimelineCompletenessResponse;
+  warnings: string[];
+  startAt: string;
+  endAt: string;
+};
+export type UsageTimelineCoverageResponse = "current" | "stale" | "missing";
+export type CostGenerationIdentityResponse = {
+  generationId: string;
+  sourceFactRevision: string;
+  pricingCatalogVersion: string;
+  pricingContentHash: string;
+  calculatorVersion: string;
+  completedAt: string;
+};
+export type UsageTimelineResponse = {
+  range: UsageTimelineRangeResponse;
+  bucketUnit: UsageTimelineBucketUnitResponse;
+  startAt: string;
+  endAt: string;
+  totals: UsageTimelineTotalsResponse;
+  buckets: UsageTimelineBucketResponse[];
+  unknownTimeObservationCount: string;
+  costCoverage: UsageTimelineCoverageResponse;
+  latestCompletedCostGeneration: CostGenerationIdentityResponse | null;
+};
+export type ErrorResponse = {
+  error: {
+    message: string;
+    code: string;
+  };
+};
 export type HealthResponse = {
   status: "healthy";
 };
@@ -112,6 +187,8 @@ export type TokenCompletenessResponse = {
 };
 export type AttributionStatus =
   "unlinked" | "unconfigured" | "pending" | "linked" | "not_found" | "error";
+export type SessionPhase =
+  "research" | "explore" | "proposal" | "apply" | "verify" | "quick-flow" | "other";
 export type LinearIssueResponse = {
   id: string;
   identifier: string;
@@ -140,7 +217,7 @@ export type LinearFailureCategory =
 export type SessionAttributionResponse = {
   status: AttributionStatus;
   candidateIdentifier?: string;
-  phase?: string;
+  phase?: SessionPhase;
   issue?: LinearIssueResponse;
   relinkRequired: boolean;
   lastAttemptAt?: string;
@@ -160,6 +237,9 @@ export type SessionResponse = {
   uncachedInputTokens: string | null;
   outputTokens: string | null;
   totalTokens: string | null;
+  estimatedCostUsd: string | null;
+  costComplete: boolean;
+  pricingGapCodes: string[];
   usageObserved: boolean;
   tokenCompleteness: TokenCompletenessResponse;
   usageAnomalies: string[];
@@ -171,12 +251,6 @@ export type SessionPageResponse = {
   total: number;
   limit: number;
   offset: number;
-};
-export type ErrorResponse = {
-  error: {
-    message: string;
-    code: string;
-  };
 };
 export type SessionRelinkResponse = {
   attribution: SessionAttributionResponse;
@@ -191,6 +265,13 @@ export type SessionRelinkErrorResponse = {
 export type SessionRelinkRequest = {
   /** Exact Linear issue identifier to link or relink. */
   issueIdentifier: string;
+};
+export type SessionPhaseResponse = {
+  attribution: SessionAttributionResponse;
+};
+export type SessionPhaseRequest = {
+  /** Canonical phase to assign, or null to clear the explicit assignment. */
+  phase: SessionPhase | null;
 };
 export type RecordAttributionStatusNumber = {
   unlinked: number;
@@ -255,14 +336,6 @@ export type IssueUsageListResponse = {
   limit: number;
   offset: number;
 };
-export type CostGenerationIdentityResponse = {
-  generationId: string;
-  sourceFactRevision: string;
-  pricingCatalogVersion: string;
-  pricingContentHash: string;
-  calculatorVersion: string;
-  completedAt: string;
-};
 export type IssueUsageModelResponse = {
   /** Canonical model identity from the latest completed cost generation, or `unknown`. */
   model: string;
@@ -272,7 +345,7 @@ export type IssueUsageModelResponse = {
 export type IssueUsageSessionResponse = {
   sessionId: string;
   title: string | null;
-  phase: string | null;
+  phase: SessionPhase | null;
   importState: string;
   lastError: string | null;
   startedAt: string | null;
@@ -377,10 +450,12 @@ export type RecalculateCostResponse = {
   coalesced: boolean;
 };
 export const {
+  useTimelineQuery,
   useGetHealthQuery,
   useListQuery,
   useDetailQuery,
   useRelinkMutation,
+  useSetPhaseMutation,
   useStatusQuery,
   useSyncMutation,
   useListIssueUsageQuery,

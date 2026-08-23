@@ -1,15 +1,20 @@
-import { appendFile, copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, test } from "bun:test";
+import type { FSWatcher } from "chokidar";
 import pino from "pino";
 
 import { AppDatabase } from "@/database/database.js";
 import { applyMigrations } from "@/database/migrate.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
-import { IngestionCoordinator } from "@/modules/sessions/coordinator.js";
+import {
+  IngestionCoordinator,
+  type IngestionCoordinatorOptions,
+} from "@/modules/sessions/coordinator.js";
 import { discoverRoot, type RootDiscoveryStatus } from "@/modules/sessions/discovery.js";
 import { CodexSourceImporter } from "@/modules/sessions/importer.js";
 
@@ -19,10 +24,16 @@ const coordinators: IngestionCoordinator[] = [];
 const databases: AppDatabase[] = [];
 const logger = pino({ enabled: false });
 
+interface CoordinatorTestOptions {
+  readonly rediscoveryMs?: number;
+  readonly watchFactory?: IngestionCoordinatorOptions["watchFactory"];
+}
+
 async function setup(
   roots: readonly string[],
   discover?: (root: string) => Promise<RootDiscoveryStatus>,
   afterCommit?: (sessionIds: readonly string[], indexPath: string) => void | Promise<void>,
+  options: CoordinatorTestOptions = {},
 ): Promise<{
   database: AppDatabase;
   repository: CodexIngestionRepository;
@@ -46,9 +57,10 @@ async function setup(
     repository,
     logger,
     debounceMs: 20,
-    rediscoveryMs: 30,
+    rediscoveryMs: options.rediscoveryMs ?? 30,
     watchUsePolling: true,
     ...(discover ? { discover } : {}),
+    ...(options.watchFactory ? { watchFactory: options.watchFactory } : {}),
     onSessionsCommitted: async (sessionIds) => {
       committed.push([...sessionIds]);
       await afterCommit?.(sessionIds, indexPath);
@@ -240,9 +252,137 @@ describe("ingestion coordinator", () => {
     });
 
     await opened.coordinator.start();
-    expect(discoveryCalls).toBe(2);
+    expect(discoveryCalls).toBeGreaterThanOrEqual(2);
     expect(await opened.repository.sessions.count()).toBe(1);
     expect(await opened.repository.sessions.findById("session-001")).toBeDefined();
+  });
+
+  test("recovers a missed append through the sweep and commits it once", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-recovery-append-"));
+    directories.push(root);
+    const path = join(root, "session.jsonl");
+    await copyFile(fixture, path);
+    const canonicalPath = await realpath(path);
+    const opened = await setup([root], undefined, undefined, {
+      rediscoveryMs: 20,
+      watchFactory: silentWatchFactory(),
+    });
+    await opened.coordinator.start();
+
+    const beforeCheckpoint = await opened.repository.checkpoints.find(canonicalPath);
+    const beforeUsage = await opened.repository.usage.findBySessionId("session-001");
+    await appendFile(
+      path,
+      `${JSON.stringify({
+        timestamp: "2026-01-02T03:11:00.000Z",
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: { input_tokens: 200, cached_input_tokens: 30, output_tokens: 50 },
+            last_token_usage: { input_tokens: 50, cached_input_tokens: 5, output_tokens: 10 },
+          },
+        },
+      })}\n`,
+    );
+
+    await waitFor(
+      async () =>
+        (await opened.repository.usage.findBySessionId("session-001"))?.totalTokens === 250n,
+    );
+    const afterImportCheckpoint = await opened.repository.checkpoints.find(canonicalPath);
+    const afterImportUsage = await opened.repository.usage.findBySessionId("session-001");
+    expect(afterImportCheckpoint).toBeDefined();
+    expect(afterImportUsage).toBeDefined();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(afterImportCheckpoint?.committedOffset).toBeGreaterThan(
+      beforeCheckpoint?.committedOffset ?? 0n,
+    );
+    expect(afterImportUsage).toMatchObject({
+      totalTokens: 250n,
+      factRevision: (beforeUsage?.factRevision ?? 0n) + 1n,
+    });
+    expect((await opened.repository.sessions.findById("session-001"))?.developerTurns).toBe(1n);
+    expect(await opened.repository.checkpoints.find(canonicalPath)).toMatchObject(
+      afterImportCheckpoint!,
+    );
+    expect(await opened.repository.usage.findBySessionId("session-001")).toMatchObject(
+      afterImportUsage!,
+    );
+  });
+
+  test("recovers a missed nested-file creation through the sweep", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-recovery-create-"));
+    directories.push(root);
+    const opened = await setup([root], undefined, undefined, {
+      rediscoveryMs: 20,
+      watchFactory: silentWatchFactory(),
+    });
+    await opened.coordinator.start();
+
+    const nested = join(root, "nested", "active.jsonl");
+    await mkdir(join(root, "nested"));
+    await copyFile(fixture, nested);
+
+    await waitFor(
+      async () => (await opened.repository.sessions.findById("session-001"))?.developerTurns === 1n,
+    );
+    expect((await opened.repository.sessions.findById("session-001"))?.developerTurns).toBe(1n);
+  });
+
+  test("coalesces overlapping recovery sweeps and stops the timer on shutdown", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-recovery-overlap-"));
+    directories.push(root);
+    let activeDiscoveries = 0;
+    let maximumActiveDiscoveries = 0;
+    let discoveryCalls = 0;
+    const discover = async (configuredRoot: string): Promise<RootDiscoveryStatus> => {
+      discoveryCalls += 1;
+      activeDiscoveries += 1;
+      maximumActiveDiscoveries = Math.max(maximumActiveDiscoveries, activeDiscoveries);
+      await new Promise((resolve) => setTimeout(resolve, 35));
+      activeDiscoveries -= 1;
+      return discoverRoot(configuredRoot);
+    };
+    const opened = await setup([root], discover, undefined, {
+      rediscoveryMs: 10,
+      watchFactory: silentWatchFactory(),
+    });
+    await opened.coordinator.start();
+    await waitFor(() => Promise.resolve(discoveryCalls >= 5), 3_000);
+    expect(maximumActiveDiscoveries).toBe(1);
+
+    await opened.coordinator.close();
+    const callsAfterClose = discoveryCalls;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(discoveryCalls).toBe(callsAfterClose);
+  });
+
+  test("isolates a recovery discovery failure from an unrelated root", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "codex-recovery-failure-"));
+    directories.push(parent);
+    const failingRoot = join(parent, "failing");
+    const healthyRoot = join(parent, "healthy");
+    await Promise.all([mkdir(failingRoot), mkdir(healthyRoot)]);
+    let failRecovery = false;
+    const discover = async (configuredRoot: string): Promise<RootDiscoveryStatus> => {
+      if (failRecovery && configuredRoot === failingRoot) throw new Error("synthetic failure");
+      return discoverRoot(configuredRoot);
+    };
+    const opened = await setup([failingRoot, healthyRoot], discover, undefined, {
+      rediscoveryMs: 20,
+      watchFactory: silentWatchFactory(),
+    });
+    await opened.coordinator.start();
+    failRecovery = true;
+    await copyFile(fixture, join(healthyRoot, "recovered.jsonl"));
+
+    await waitFor(async () => (await opened.repository.sessions.count()) === 1);
+    expect((await opened.coordinator.status()).roots).toMatchObject([
+      { available: false, reason: "unreadable" },
+      { available: true },
+    ]);
   });
 
   test("keeps multiple roots independent and isolates a failing source", async () => {
@@ -301,4 +441,13 @@ async function writeIndex(
   record: { id: string; thread_name: string; updated_at: string },
 ): Promise<void> {
   await writeFile(path, `${JSON.stringify(record)}\n`);
+}
+
+function silentWatchFactory(): NonNullable<IngestionCoordinatorOptions["watchFactory"]> {
+  return () => {
+    const watcher = new EventEmitter();
+    const close = (): Promise<void> => Promise.resolve();
+    queueMicrotask(() => watcher.emit("ready"));
+    return Object.assign(watcher, { close }) as unknown as FSWatcher;
+  };
 }

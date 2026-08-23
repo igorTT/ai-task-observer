@@ -1,3 +1,6 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type {
   LinearFailureCategory,
   LinearSyncRun,
@@ -14,10 +17,10 @@ export interface LinearSyncRunRow {
   readonly not_found_count: number;
   readonly error_count: number;
   readonly failure_category: LinearFailureCategory | null;
-  readonly started_at: Date | null;
-  readonly completed_at: Date | null;
-  readonly created_at: Date;
-  readonly updated_at: Date;
+  readonly started_at: DuckDBTimestampTZValue | null;
+  readonly completed_at: DuckDBTimestampTZValue | null;
+  readonly created_at: DuckDBTimestampTZValue;
+  readonly updated_at: DuckDBTimestampTZValue;
 }
 
 export function mapLinearSyncRunRow(row: LinearSyncRunRow): LinearSyncRun {
@@ -30,9 +33,11 @@ export function mapLinearSyncRunRow(row: LinearSyncRunRow): LinearSyncRun {
     notFoundCount: Number(row.not_found_count),
     errorCount: Number(row.error_count),
     ...(row.failure_category === null ? {} : { failureCategory: row.failure_category }),
-    ...(row.started_at === null ? {} : { startedAt: new Date(row.started_at) }),
-    ...(row.completed_at === null ? {} : { completedAt: new Date(row.completed_at) }),
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
+    ...(row.started_at === null ? {} : { startedAt: mapTimestampWithTimeZone(row.started_at) }),
+    ...(row.completed_at === null
+      ? {}
+      : { completedAt: mapTimestampWithTimeZone(row.completed_at) }),
+    createdAt: mapTimestampWithTimeZone(row.created_at),
+    updatedAt: mapTimestampWithTimeZone(row.updated_at),
   };
 }

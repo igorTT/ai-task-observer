@@ -61,6 +61,11 @@ describe("loadConfig", () => {
     expect(Object.isFrozen(config.codexSessionRoots)).toBe(true);
   });
 
+  test("keeps missed-event recovery at a minute-scale default and accepts an override", () => {
+    expect(loadConfig({}).codexRootRediscoveryMs).toBe(60_000);
+    expect(loadConfig({ CODEX_ROOT_REDISCOVERY_MS: "5000" }).codexRootRediscoveryMs).toBe(5_000);
+  });
+
   test("normalizes a custom session index path", () => {
     expect(
       loadConfig({ CODEX_SESSION_INDEX_PATH: " ./fixtures/session_index.jsonl " }),

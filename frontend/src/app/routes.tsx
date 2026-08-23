@@ -6,7 +6,7 @@ export function ApplicationShell() {
   return (
     <div className="app">
       <header className="app-header">
-        <NavLink to="/issues" className="brand">
+        <NavLink to="/overview" className="brand">
           <Activity aria-hidden="true" className="text-primary" />
           <span>
             <strong>AI Task Observer</strong>
@@ -14,6 +14,7 @@ export function ApplicationShell() {
           </span>
         </NavLink>
         <nav aria-label="Primary navigation" className="primary-nav">
+          <NavLink to="/overview">Overview</NavLink>
           <NavLink to="/issues">Issues</NavLink>
           <NavLink to="/sessions">Sessions</NavLink>
         </nav>
@@ -35,10 +36,10 @@ export function RouteErrorBoundary() {
       <p className="eyebrow">Dashboard error</p>
       <h1>Something went wrong</h1>
       <p className="mt-3 text-slate-600">
-        The route could not be displayed. Return to the issue overview and try again.
+        The route could not be displayed. Return to the recent usage overview and try again.
       </p>
-      <a className="safe-link mt-4" href="/issues">
-        Go to issue usage
+      <a className="safe-link mt-4" href="/overview">
+        Go to overview
       </a>
       {import.meta.env.DEV && error instanceof Error && (
         <pre className="mt-4 overflow-auto rounded bg-slate-100 p-4 text-xs">{error.message}</pre>
@@ -51,8 +52,8 @@ export function NotFoundPage() {
     <section>
       <p className="eyebrow">Not found</p>
       <h1>That dashboard page does not exist</h1>
-      <a className="safe-link mt-4" href="/issues">
-        Go to issue usage
+      <a className="safe-link mt-4" href="/overview">
+        Go to overview
       </a>
     </section>
   );

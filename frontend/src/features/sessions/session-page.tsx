@@ -13,8 +13,9 @@ import { normalizeApiError } from "@/lib/api-error";
 import {
   formatCode,
   formatCompactTokenCount,
+  formatDateTime,
   formatNullableCount,
-  formatUtcDate,
+  formatUsd,
 } from "@/lib/formatters";
 import { PAGE_SIZE, pageOffset, totalPages, useUrlPage } from "@/lib/pagination";
 
@@ -50,7 +51,13 @@ export function SessionPage() {
   );
 }
 
-function SessionCard({ session, linearReady }: { session: SessionResponse; linearReady: boolean }) {
+export function SessionCard({
+  session,
+  linearReady,
+}: {
+  session: SessionResponse;
+  linearReady: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [relink, mutation] = useRelinkMutation();
   const attribution = session.attribution;
@@ -120,11 +127,15 @@ function SessionCard({ session, linearReady }: { session: SessionResponse; linea
         </div>
         <div>
           <dt>Started</dt>
-          <dd>{formatUtcDate(session.startedAt)}</dd>
+          <dd>{formatDateTime(session.startedAt)}</dd>
         </div>
         <div>
           <dt>Developer turns</dt>
           <dd>{formatNullableCount(session.developerTurns)}</dd>
+        </div>
+        <div>
+          <dt>Estimated cost</dt>
+          <dd>{formatUsd(session.estimatedCostUsd)}</dd>
         </div>
       </dl>
       {attribution.relinkRequired && (
@@ -148,11 +159,11 @@ function SessionCard({ session, linearReady }: { session: SessionResponse; linea
             cachedInputTokens: session.cachedInputTokens,
             outputTokens: session.outputTokens,
             totalTokens: session.totalTokens,
-            estimatedCostUsd: null,
+            estimatedCostUsd: session.estimatedCostUsd,
             tokenComplete: Object.values(session.tokenCompleteness).every(Boolean),
-            costComplete: false,
+            costComplete: session.costComplete,
             anomalyCodes: session.usageAnomalies,
-            pricingGapCodes: [],
+            pricingGapCodes: session.pricingGapCodes,
           }}
         />
       </div>

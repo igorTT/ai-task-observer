@@ -1,8 +1,6 @@
-import { cp, mkdir } from "node:fs/promises";
+import { cp, mkdir, rm } from "node:fs/promises";
 
-await mkdir(new URL("../dist/database/migrations/", import.meta.url), { recursive: true });
-await cp(
-  new URL("../src/database/migrations/", import.meta.url),
-  new URL("../dist/database/migrations/", import.meta.url),
-  { recursive: true },
-);
+const destination = new URL("../dist/database/migrations/", import.meta.url);
+await rm(destination, { recursive: true, force: true });
+await mkdir(destination, { recursive: true });
+await cp(new URL("../src/database/migrations/", import.meta.url), destination, { recursive: true });

@@ -3,11 +3,11 @@ import { normalizeApiError } from "@/lib/api-error";
 import {
   formatCode,
   formatCompactTokenCount,
+  formatDateTime,
   formatDecimalCount,
   formatDuration,
   formatNullableCount,
   formatUsd,
-  formatUtcDate,
 } from "@/lib/formatters";
 import { pageOffset, parsePage, totalPages } from "@/lib/pagination";
 
@@ -49,8 +49,16 @@ describe("honest formatting", () => {
     expect(formatUsd(null)).toBe("Unavailable");
   });
 
-  test("handles UTC, unknown dates, duration, and sanitized codes", () => {
-    expect(formatUtcDate(null)).toBe("Unknown time");
+  test("formats timestamps in a client zone across a calendar boundary", () => {
+    expect(formatDateTime("2026-01-01T00:30:00Z", "America/Los_Angeles")).toBe(
+      "Dec 31, 2025 at 4:30 PM",
+    );
+  });
+
+  test("handles unknown timestamps, duration, and sanitized codes", () => {
+    for (const value of [undefined, null, "", "not-a-timestamp"]) {
+      expect(formatDateTime(value)).toBe("Unknown time");
+    }
     expect(formatDuration("2026-01-01T00:00:00Z", "2026-01-01T01:05:00Z")).toBe("1h 5m");
     expect(formatCode("pricing_gap<script>")).toBe("Pricing Gapscript");
   });

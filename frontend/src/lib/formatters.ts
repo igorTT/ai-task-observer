@@ -49,15 +49,31 @@ export function formatUsd(value: string | null): string {
     .padStart(2, "0")}`;
 }
 
-export function formatUtcDate(value: string | null | undefined): string {
+export function formatDateTime(value: string | null | undefined, timeZone?: string): string {
   if (!value) return "Unknown time";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.valueOf())) return "Unknown time";
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: value.includes("T") ? "short" : undefined,
-    timeZone: "UTC",
+    timeZone: timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   }).format(parsed);
+}
+
+export function formatUsageInterval(startAt: string, endAt: string, timeZone?: string): string {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (!Number.isFinite(start.valueOf()) || !Number.isFinite(end.valueOf())) {
+    return "Unknown time interval";
+  }
+  const formatter = new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
 }
 
 export function formatDuration(start?: string | null, end?: string | null): string {

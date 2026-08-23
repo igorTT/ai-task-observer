@@ -14,7 +14,6 @@ export interface AttributionStateInput {
   readonly sessionId: string;
   readonly titleFingerprint: string;
   readonly candidateIdentifier?: string;
-  readonly phase?: string;
   readonly status: AttributionStatus;
   readonly linearId?: string;
   readonly lastAttemptAt?: Date;
@@ -26,37 +25,43 @@ export class LinearSessionAttributionRepository {
   public constructor(private readonly connection: DuckDBConnection) {}
 
   public async save(input: AttributionStateInput): Promise<void> {
-    const statement = await this.connection.prepare(`
-      INSERT INTO linear_session_attributions (
-        session_id, title_fingerprint, candidate_identifier, phase, resolution_status,
-        linear_id, last_attempt_at, last_success_at, failure_category
-      ) VALUES (
-        $sessionId, $fingerprint, $candidate, $phase, $status,
-        $linearId, $lastAttemptAt, $lastSuccessAt, $failureCategory
-      )
-      ON CONFLICT (session_id) DO UPDATE SET
-        title_fingerprint = excluded.title_fingerprint,
-        candidate_identifier = excluded.candidate_identifier,
-        phase = excluded.phase,
-        resolution_status = excluded.resolution_status,
-        linear_id = excluded.linear_id,
-        last_attempt_at = excluded.last_attempt_at,
-        last_success_at = excluded.last_success_at,
-        failure_category = excluded.failure_category,
-        updated_at = now()
-    `);
-    statement.bind({
+    const parameters = {
       sessionId: input.sessionId,
       fingerprint: input.titleFingerprint,
       candidate: input.candidateIdentifier ?? null,
-      phase: input.phase ?? null,
       status: input.status,
       linearId: input.linearId ?? null,
       lastAttemptAt: input.lastAttemptAt?.toISOString() ?? null,
       lastSuccessAt: input.lastSuccessAt?.toISOString() ?? null,
       failureCategory: input.failureCategory ?? null,
-    });
-    await statement.run();
+    };
+    const update = await this.connection.prepare(`
+      UPDATE linear_session_attributions SET
+        title_fingerprint = $fingerprint,
+        candidate_identifier = $candidate,
+        resolution_status = $status,
+        linear_id = $linearId,
+        last_attempt_at = $lastAttemptAt,
+        last_success_at = $lastSuccessAt,
+        failure_category = $failureCategory,
+        updated_at = now()
+      WHERE session_id = $sessionId
+    `);
+    update.bind(parameters);
+    await update.run();
+    if (await this.findBySessionId(input.sessionId)) return;
+
+    const insert = await this.connection.prepare(`
+      INSERT INTO linear_session_attributions (
+        session_id, title_fingerprint, candidate_identifier, resolution_status,
+        linear_id, last_attempt_at, last_success_at, failure_category
+      ) VALUES (
+        $sessionId, $fingerprint, $candidate, $status,
+        $linearId, $lastAttemptAt, $lastSuccessAt, $failureCategory
+      )
+    `);
+    insert.bind(parameters);
+    await insert.run();
   }
 
   public async replaceLink(
@@ -66,7 +71,6 @@ export class LinearSessionAttributionRepository {
       UPDATE linear_session_attributions SET
         title_fingerprint = $fingerprint,
         candidate_identifier = $candidate,
-        phase = $phase,
         resolution_status = 'linked',
         linear_id = $linearId,
         last_attempt_at = $lastAttemptAt,
@@ -79,7 +83,6 @@ export class LinearSessionAttributionRepository {
       sessionId: input.sessionId,
       fingerprint: input.titleFingerprint,
       candidate: input.candidateIdentifier ?? null,
-      phase: input.phase ?? null,
       linearId: input.linearId,
       lastAttemptAt: input.lastAttemptAt?.toISOString() ?? null,
       lastSuccessAt: input.lastSuccessAt?.toISOString() ?? null,

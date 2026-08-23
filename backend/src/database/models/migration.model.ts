@@ -1,3 +1,7 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
+
 export interface MigrationRecord {
   readonly version: number;
   readonly name: string;
@@ -9,7 +13,7 @@ export interface MigrationRow {
   readonly version: number | bigint;
   readonly name: string;
   readonly checksum: string;
-  readonly applied_at: Date;
+  readonly applied_at: DuckDBTimestampTZValue;
 }
 
 export function mapMigrationRow(row: MigrationRow): MigrationRecord {
@@ -17,6 +21,6 @@ export function mapMigrationRow(row: MigrationRow): MigrationRecord {
     version: Number(row.version),
     name: row.name,
     checksum: row.checksum,
-    appliedAt: new Date(row.applied_at),
+    appliedAt: mapTimestampWithTimeZone(row.applied_at),
   };
 }

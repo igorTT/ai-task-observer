@@ -10,7 +10,7 @@ import { parseSessionTitle } from "@/modules/linear/title-parser.js";
 describe("Linear session title parser", () => {
   test.each([
     ["ENG-215", { kind: "candidate", candidateIdentifier: "ENG-215" }],
-    [" eng-215:  apply ", { kind: "candidate", candidateIdentifier: "ENG-215", phase: "apply" }],
+    [" eng-215:  apply ", { kind: "candidate", candidateIdentifier: "ENG-215" }],
     ["A1-9:", { kind: "candidate", candidateIdentifier: "A1-9" }],
     ["ENG-0", { kind: "unlinked" }],
     ["ENG--1", { kind: "unlinked" }],
@@ -25,7 +25,7 @@ describe("Linear session title parser", () => {
 });
 
 describe("current attribution state", () => {
-  test("handles new, renamed, phase-only, unconfigured, not-found, and retryable states", () => {
+  test("handles new, renamed, unconfigured, not-found, and retryable states", () => {
     const initial = stateForCurrentTitle({
       sessionId: "session",
       title: "ENG-1: explore",
@@ -44,18 +44,19 @@ describe("current attribution state", () => {
         updatedAt: new Date(),
       },
     });
-    const phaseOnly = stateForCurrentTitle({
+    const suffixOnly = stateForCurrentTitle({
       sessionId: "session",
       title: "ENG-1: apply",
       configured: true,
       previous: linked,
     });
-    expect(phaseOnly).toMatchObject({ status: "linked", linearId: "issue-1", phase: "apply" });
+    expect(suffixOnly).toMatchObject({ status: "linked", linearId: "issue-1" });
+    expect(suffixOnly).not.toHaveProperty("phase");
     const renamed = stateForCurrentTitle({
       sessionId: "session",
       title: "ENG-2",
       configured: true,
-      previous: phaseOnly,
+      previous: suffixOnly,
     });
     expect(renamed).toMatchObject({
       status: "linked",

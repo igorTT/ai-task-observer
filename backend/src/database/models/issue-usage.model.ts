@@ -1,6 +1,11 @@
-import type { DuckDBDecimalValue } from "@duckdb/node-api";
+import type { DuckDBDateValue, DuckDBDecimalValue, DuckDBTimestampTZValue } from "@duckdb/node-api";
 
+import {
+  mapNullableDateAsUtc,
+  mapNullableTimestampWithTimeZone,
+} from "@/database/models/timestamp.model.js";
 import { parseFixedDecimal, serializeDecimal } from "@/modules/pricing/domain.js";
+import type { SessionPhase } from "@/modules/sessions/domain.js";
 
 export interface IssueUsageMetricRow {
   readonly session_count: bigint;
@@ -49,17 +54,17 @@ export interface IssueUsageSummaryRecord {
 export interface IssueUsageSessionRow extends IssueUsageMetricRow {
   readonly session_id: string;
   readonly session_title: string | null;
-  readonly phase: string | null;
+  readonly phase: SessionPhase | null;
   readonly import_state: string;
   readonly last_error: string | null;
-  readonly started_at: Date | null;
-  readonly ended_at: Date | null;
+  readonly started_at: DuckDBTimestampTZValue | null;
+  readonly ended_at: DuckDBTimestampTZValue | null;
 }
 
 export interface IssueUsageSessionRecord {
   readonly sessionId: string;
   readonly title: string | null;
-  readonly phase: string | null;
+  readonly phase: SessionPhase | null;
   readonly importState: string;
   readonly lastError: string | null;
   readonly startedAt: Date | null;
@@ -79,7 +84,7 @@ export interface IssueUsageModelRecord {
 }
 
 export interface IssueUsageDailyRow extends IssueUsageMetricRow {
-  readonly activity_date: Date | null;
+  readonly activity_date: DuckDBDateValue | null;
 }
 
 export interface IssueUsageDailyRecord {
@@ -104,8 +109,8 @@ export function mapIssueUsageSessionRow(row: IssueUsageSessionRow): IssueUsageSe
     phase: row.phase,
     importState: row.import_state,
     lastError: row.last_error,
-    startedAt: row.started_at === null ? null : new Date(row.started_at),
-    endedAt: row.ended_at === null ? null : new Date(row.ended_at),
+    startedAt: mapNullableTimestampWithTimeZone(row.started_at),
+    endedAt: mapNullableTimestampWithTimeZone(row.ended_at),
     metrics: mapIssueUsageMetrics(row),
   };
 }
@@ -122,7 +127,7 @@ export function mapIssueUsageModelRow(row: IssueUsageModelRow): IssueUsageModelR
 
 export function mapIssueUsageDailyRow(row: IssueUsageDailyRow): IssueUsageDailyRecord {
   return {
-    date: row.activity_date === null ? null : new Date(row.activity_date),
+    date: mapNullableDateAsUtc(row.activity_date),
     metrics: mapIssueUsageMetrics(row),
   };
 }

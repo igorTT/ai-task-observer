@@ -85,15 +85,16 @@ workflow depends on this capability before it can reliably inspect current title
 ## Linear attribution
 
 A trimmed session title is attributable only when it begins with the exact grammar
-`<team-key>-<positive-integer>[: <phase>]`. Team keys are letter-led and alphanumeric; issue
+`<team-key>-<positive-integer>[: <suffix>]`. Team keys are letter-led and alphanumeric; issue
 identifiers are normalized to uppercase. Examples are `ENG-215`, `ENG-215: apply`, and
-`eng-215: review`. Phase text is optional, free-form metadata. Identifiers found later in an
-ordinary title, zero or negative numbers, and suffix text without a colon stay unlinked.
+`eng-215: review`. A colon suffix remains compatible for Linear candidate parsing, but it never
+assigns a phase. Identifiers found later in an ordinary title, zero or negative numbers, and suffix
+text without a colon stay unlinked.
 
 The backend reconciles attribution after committed imports, at configured startup, and on an
 explicit request. A valid title can establish the initial link only while the session has no
-stored issue. Once linked, later title changes update the candidate and phase for review but do
-not move or clear the stored issue. Issue lookups are grouped and concurrency-limited. A fresh
+stored issue. Once linked, later title changes update the candidate for review but do not move or
+clear the stored issue or explicit phase. Issue lookups are grouped and concurrency-limited. A fresh
 cached summary is reused until `LINEAR_CACHE_TTL_MS`; stale linked summaries are refreshed by
 their stored issue identity during startup or manual synchronization. Confirmed absence becomes
 `not_found` for an unlinked candidate and remains eligible for a later retry. Transient failures
@@ -107,6 +108,9 @@ do not erase an existing committed link.
   and replaces the stored link only after exact success. Missing candidates, stale titles,
   inaccessible issues, authentication failures, identifier mismatches, and transient failures
   return sanitized errors while preserving the previous link.
+- `PUT /api/sessions/{sessionId}/phase` explicitly assigns or clears a session phase. The allowed
+  values are `research`, `explore`, `proposal`, `apply`, `verify`, `quick-flow`, and `other`;
+  sending `null` leaves the session unassigned. Repeating the same assignment is safe.
 
 Linear access is strictly read-only. Attribution never changes issues, comments, labels, or
 workflow state. Only the issue ID, identifier, title, URL, team summary, workflow-state summary,
@@ -131,7 +135,8 @@ migration. The production build copies migrations beside the compiled database c
 - Discover historical Codex Desktop session files
 - Watch for new and updated sessions
 - Parse Codex session events safely and incrementally
-- Extract the Linear issue identifier and optional phase from session titles
+- Extract the Linear issue identifier from session titles while retaining colon-suffix compatibility
+- Persist explicit session phases independently of Linear attribution
 - Count developer turns and token usage
 - Calculate estimated cost from the JSON pricing configuration
 - Fetch and cache issue metadata through the Linear SDK

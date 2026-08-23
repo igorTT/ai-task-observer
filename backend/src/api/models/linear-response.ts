@@ -3,6 +3,7 @@ import type {
   LinearFailureCategory,
   LinearSyncRun,
 } from "@/modules/linear/domain.js";
+import type { SessionPhase } from "@/modules/sessions/domain.js";
 
 export interface LinearIssueResponse {
   readonly id: string;
@@ -18,7 +19,7 @@ export interface LinearIssueResponse {
 export interface SessionAttributionResponse {
   readonly status: AttributionStatus;
   readonly candidateIdentifier?: string;
-  readonly phase?: string;
+  readonly phase?: SessionPhase;
   readonly issue?: LinearIssueResponse;
   readonly relinkRequired: boolean;
   readonly lastAttemptAt?: string;

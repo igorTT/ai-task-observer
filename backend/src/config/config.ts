@@ -7,6 +7,7 @@ const defaultPricingCatalogPath = fileURLToPath(
   new URL("../../config/models.json", import.meta.url),
 );
 const defaultCodexSessionIndexPath = resolve(homedir(), ".codex", "session_index.jsonl");
+const defaultCodexRootRediscoveryMs = 60_000;
 
 const logLevels = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
 
@@ -59,7 +60,13 @@ const environmentSchema = z.object({
     1_024 * 1_024,
   ),
   CODEX_WATCH_DEBOUNCE_MS: positiveInteger("CODEX_WATCH_DEBOUNCE_MS", 10, 60_000, 1_000),
-  CODEX_ROOT_REDISCOVERY_MS: positiveInteger("CODEX_ROOT_REDISCOVERY_MS", 1_000, 3_600_000, 60_000),
+  // Native watcher events remain the prompt path; this interval also recovers missed events.
+  CODEX_ROOT_REDISCOVERY_MS: positiveInteger(
+    "CODEX_ROOT_REDISCOVERY_MS",
+    1_000,
+    3_600_000,
+    defaultCodexRootRediscoveryMs,
+  ),
   LINEAR_API_KEY: z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     z.string().trim().min(10, "LINEAR_API_KEY must be at least 10 characters").optional(),

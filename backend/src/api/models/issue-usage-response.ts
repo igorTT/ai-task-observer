@@ -1,3 +1,5 @@
+import type { SessionPhase } from "@/modules/sessions/domain.js";
+
 /** Shared accounting metrics. Integer and fixed-decimal values are strings for JSON safety. */
 export interface UsageMetricsResponse {
   /** Distinct sessions in this grouping. Daily values are non-additive across buckets. */
@@ -43,7 +45,7 @@ export interface IssueUsageModelResponse {
 export interface IssueUsageSessionResponse {
   readonly sessionId: string;
   readonly title: string | null;
-  readonly phase: string | null;
+  readonly phase: SessionPhase | null;
   readonly importState: string;
   readonly lastError: string | null;
   readonly startedAt: string | null;

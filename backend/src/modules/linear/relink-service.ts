@@ -86,7 +86,6 @@ export class SessionRelinkService {
           sessionId,
           titleFingerprint: titleFingerprint(currentSession.currentTitle),
           candidateIdentifier: normalizedIdentifier,
-          ...(previous?.phase ? { phase: previous.phase } : {}),
           status: "linked",
           linearId: result.issue.linearId,
           lastAttemptAt: now,

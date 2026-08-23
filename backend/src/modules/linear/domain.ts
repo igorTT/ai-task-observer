@@ -38,7 +38,6 @@ export interface SessionAttribution {
   readonly sessionId: string;
   readonly titleFingerprint: string;
   readonly candidateIdentifier?: string;
-  readonly phase?: string;
   readonly status: AttributionStatus;
   readonly linearId?: string;
   readonly lastAttemptAt?: Date;

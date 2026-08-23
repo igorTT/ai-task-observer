@@ -183,7 +183,12 @@ export class CodexIngestionRepository {
   }
 
   async #deleteSession(sessionId: string): Promise<void> {
-    for (const table of ["linear_session_attributions", "codex_session_usage", "codex_sessions"]) {
+    for (const table of [
+      "session_phase_assignments",
+      "linear_session_attributions",
+      "codex_session_usage",
+      "codex_sessions",
+    ]) {
       const statement = await this.connection.prepare(
         `DELETE FROM ${table} WHERE session_id = $sessionId`,
       );

@@ -26,6 +26,11 @@ import type { PricingCatalog } from "@/modules/pricing/domain.js";
 import { CostCalculationRepository } from "@/database/repositories/cost-calculation-repository.js";
 import { IssueUsageRepository } from "@/database/repositories/issue-usage-repository.js";
 import { IssueUsageQueryService } from "@/modules/issues/issue-usage-query-service.js";
+import { SessionCostRepository } from "@/database/repositories/session-cost-repository.js";
+import { UsageTimelineRepository } from "@/database/repositories/usage-timeline-repository.js";
+import { UsageTimelineQueryService } from "@/modules/usage-timeline/query-service.js";
+import { SessionPhaseAssignmentRepository } from "@/database/repositories/session-phase-assignment-repository.js";
+import { SessionPhaseService } from "@/modules/sessions/session-phase-service.js";
 
 export interface RunningServer {
   readonly httpServer: Server;
@@ -115,17 +120,28 @@ export async function startServer(
     const activeIngestion = ingestion;
     await activeAttribution.start();
     await activeCosts.start();
+    const phaseAssignments = new SessionPhaseAssignmentRepository(database.connection);
     const app = createApp({
       logger,
       api: {
         ingestion: activeIngestion,
         sessions: activeIngestion.sessions,
+        phase: new SessionPhaseService({
+          database,
+          sessions: new CodexSessionRepository(database.connection),
+          assignments: phaseAssignments,
+          query: activeIngestion.sessions,
+        }),
         linear: activeAttribution,
         costs: activeCosts,
         issueUsage: new IssueUsageQueryService(
           new IssueUsageRepository(database.connection),
           new CostCalculationRepository(database.connection),
         ),
+        usageTimeline: new UsageTimelineQueryService({
+          repository: new UsageTimelineRepository(database.connection),
+          costs: activeCosts,
+        }),
       },
     });
     const httpServer = app.listen(config.port, config.host);
@@ -200,8 +216,16 @@ function createIngestion(
   });
   const attributions = new LinearSessionAttributionRepository(database.connection);
   const issues = new LinearIssueRepository(database.connection);
+  const phases = new SessionPhaseAssignmentRepository(database.connection);
   return Object.assign(coordinator, {
-    sessions: new SessionQueryService(repository.sessions, repository.usage, attributions, issues),
+    sessions: new SessionQueryService(
+      repository.sessions,
+      repository.usage,
+      attributions,
+      issues,
+      new SessionCostRepository(database.connection),
+      phases,
+    ),
   });
 }
 

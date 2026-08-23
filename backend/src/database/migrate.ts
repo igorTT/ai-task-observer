@@ -75,9 +75,18 @@ export async function applyMigrations(
 
     try {
       await database.connection.run("BEGIN TRANSACTION");
-      await database.connection.run(migration.sql);
+      const extracted = await database.connection.extractStatements(migration.sql);
+      for (let index = 0; index < extracted.count; index += 1) {
+        const statement = await extracted.prepare(index);
+        try {
+          await statement.run();
+        } finally {
+          statement.destroySync();
+        }
+      }
       await repository.insert(migration.version, migration.name, migration.checksum);
       await database.connection.run("COMMIT");
+      await database.connection.run("CHECKPOINT");
       logger.info({ migration: migration.version, name: migration.name }, "migration applied");
     } catch (error) {
       try {

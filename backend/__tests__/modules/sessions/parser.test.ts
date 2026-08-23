@@ -9,6 +9,9 @@ const fixture = fileURLToPath(new URL("../../fixtures/codex/valid-session.jsonl"
 const variantsFixture = fileURLToPath(
   new URL("../../fixtures/codex/record-variants.jsonl", import.meta.url),
 );
+const itemCompletedFixture = fileURLToPath(
+  new URL("../../fixtures/codex/item-completed-user-turns.jsonl", import.meta.url),
+);
 const usageFixture = fileURLToPath(
   new URL("../../fixtures/codex/usage-events.jsonl", import.meta.url),
 );
@@ -141,6 +144,38 @@ describe("Codex parser adapter", () => {
     expect(parsed.events.filter((event) => event.kind === "user_message")).toHaveLength(1);
     expect(parsed.observations).toHaveLength(4);
     expect(parsed.diagnostics).toMatchObject({ unknownRecords: 0, malformedRecords: 0 });
+  });
+
+  test("normalizes explicit user formats and excludes mirrors and unsupported completed items", async () => {
+    const parsed = parseCodexRecords(await lines(itemCompletedFixture), {
+      sourceRoot: "/root",
+      sourcePath: "/root/item-completed.jsonl",
+      sourceIdentity: "item-completed-fixture",
+    });
+    const userEvents = parsed.events.filter((event) => event.kind === "user_message");
+
+    expect(userEvents).toHaveLength(2);
+    expect(userEvents.map((event) => event.sourceRecordNumber)).toEqual([2n, 3n]);
+    expect(userEvents.map((event) => event.messageContent)).toEqual([
+      "SYNTHETIC_LEGACY_USER",
+      "SYNTHETIC_CURRENT_USER",
+    ]);
+    expect(parsed.events.filter((event) => event.kind === "assistant_message")).toHaveLength(0);
+    expect(parsed.diagnostics).toMatchObject({ unknownRecords: 0, malformedRecords: 0 });
+
+    const serialized = JSON.stringify(parsed, jsonSafeReplacer);
+    expect(serialized).toContain("SYNTHETIC_LEGACY_USER");
+    expect(serialized).toContain("SYNTHETIC_CURRENT_USER");
+    for (const marker of [
+      "SYNTHETIC_UNSUPPORTED_INPUT",
+      "SYNTHETIC_MIRRORED_USER",
+      "SYNTHETIC_NON_USER_COMPLETED",
+      "SYNTHETIC_UNSUPPORTED_USER_CONTENT",
+      "SYNTHETIC_MALFORMED_USER_CONTENT",
+      "SYNTHETIC_WRONG_CASE_USER",
+    ]) {
+      expect(serialized).not.toContain(marker);
+    }
   });
 });
 

@@ -10,9 +10,10 @@ export const dashboardApi = generatedApi.enhanceEndpoints({
     listIssueUsage: { providesTags: ["IssueUsage"] },
     getIssueUsage: { providesTags: ["IssueUsage"] },
     importStatus: { providesTags: ["ImportStatus"] },
-    rescan: { invalidatesTags: ["ImportStatus", "Sessions", "IssueUsage"] },
+    rescan: { invalidatesTags: ["ImportStatus", "Sessions", "IssueUsage", "UsageTimeline"] },
     costCalculationStatus: { providesTags: ["CostStatus"] },
-    recalculateCosts: { invalidatesTags: ["CostStatus", "IssueUsage"] },
+    recalculateCosts: { invalidatesTags: ["CostStatus", "IssueUsage", "UsageTimeline"] },
+    timeline: { providesTags: ["UsageTimeline"] },
   },
 });
 
@@ -27,4 +28,5 @@ export const {
   useRescanMutation,
   useCostCalculationStatusQuery,
   useRecalculateCostsMutation,
+  useTimelineQuery: useUsageTimelineQuery,
 } = dashboardApi;

@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Activity, Calculator, Database, RefreshCw, X } from "lucide-react";
+import { useDispatch } from "react-redux";
+import { dashboardApi } from "@/api/dashboard-api";
 import {
   useCostCalculationStatusQuery,
   useImportStatusQuery,
@@ -18,18 +20,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { normalizeApiError } from "@/lib/api-error";
-import { formatCode, formatUtcDate } from "@/lib/formatters";
-
-const POLL_MS = 1500;
+import { formatCode, formatDateTime } from "@/lib/formatters";
 
 export function OperationsPanel() {
   const [open, setOpen] = useState(false);
   const imports = useImportStatusQuery();
   const linear = useLinearStatusQuery();
   const costs = useCostCalculationStatusQuery();
-  useActivePolling(isActive(imports.data?.currentRun?.state), imports.refetch);
-  useActivePolling(isActive(linear.data?.currentRun?.state), linear.refetch);
-  useActivePolling(Boolean(costs.data?.active || costs.data?.queued), costs.refetch);
+  useTerminalTimelineRefresh(isActive(imports.data?.currentRun?.state));
+  useTerminalTimelineRefresh(Boolean(costs.data?.active || costs.data?.queued));
+  const refreshing = imports.isFetching || linear.isFetching || costs.isFetching;
   const attention =
     imports.isError ||
     linear.isError ||
@@ -55,14 +55,29 @@ export function OperationsPanel() {
         <aside id="operations-panel" aria-label="Operational status" className="operations-panel">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Operational status</h2>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label="Close operational status"
-              onClick={() => setOpen(false)}
-            >
-              <X size={16} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Refresh operational status"
+                aria-busy={refreshing}
+                disabled={refreshing}
+                onClick={() => {
+                  void Promise.all([imports.refetch(), linear.refetch(), costs.refetch()]);
+                }}
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                <span className="ml-2">{refreshing ? "Refreshing…" : "Refresh"}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Close operational status"
+                onClick={() => setOpen(false)}
+              >
+                <X size={16} />
+              </Button>
+            </div>
           </div>
           <div className="mt-5 space-y-4">
             <ImportStatus data={imports.data} error={imports.error} />
@@ -78,6 +93,14 @@ export function OperationsPanel() {
 function ImportStatus({ data, error }: { data: ImportStatusResponse | undefined; error: unknown }) {
   const [run, action] = useRescanMutation();
   const active = isActive(data?.currentRun?.state);
+  const attentionCheckpoints =
+    data?.checkpoints.filter(
+      (checkpoint) =>
+        checkpoint.status !== "ready" ||
+        checkpoint.unknownRecords > 0 ||
+        checkpoint.malformedRecords > 0 ||
+        Boolean(checkpoint.lastError),
+    ) ?? [];
   return (
     <StatusCard
       icon={<Database />}
@@ -119,11 +142,12 @@ function ImportStatus({ data, error }: { data: ImportStatusResponse | undefined;
               {data.lastCompletedRun.errors} errors
             </p>
           )}
-          {data.checkpoints.map((checkpoint) => (
+          {attentionCheckpoints.map((checkpoint) => (
             <p className="mt-2" key={checkpoint.source}>
               Checkpoint {checkpoint.source}: {formatCode(checkpoint.status)} at offset{" "}
               {checkpoint.completeOffset} · {checkpoint.unknownRecords} unknown ·{" "}
               {checkpoint.malformedRecords} malformed
+              {checkpoint.lastError && ` · ${checkpoint.lastError}`}
             </p>
           ))}
         </>
@@ -199,7 +223,7 @@ function CostStatus({
           <p>
             Coverage: {data.coverage}.{" "}
             {data.latestCompleted
-              ? `Generation ${data.latestCompleted.generationId} completed ${formatUtcDate(data.latestCompleted.completedAt)}`
+              ? `Generation ${data.latestCompleted.generationId} completed ${formatDateTime(data.latestCompleted.completedAt)}`
               : "No completed generation."}
           </p>
           <p className="mt-2">
@@ -263,10 +287,16 @@ function isActive(state?: string) {
   return state === "queued" || state === "running" || state === "active";
 }
 
-function useActivePolling(active: boolean, refetch: () => unknown) {
+function useTerminalTimelineRefresh(active: boolean) {
+  const dispatch = useDispatch();
+  const wasActive = useRef(false);
   useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => void refetch(), POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [active, refetch]);
+    if (active) {
+      wasActive.current = true;
+      return;
+    }
+    if (!wasActive.current) return;
+    wasActive.current = false;
+    dispatch(dashboardApi.util.invalidateTags(["UsageTimeline"]));
+  }, [active, dispatch]);
 }

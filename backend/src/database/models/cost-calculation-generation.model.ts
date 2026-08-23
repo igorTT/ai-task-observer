@@ -1,3 +1,10 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import {
+  mapNullableTimestampWithTimeZone,
+  mapTimestampWithTimeZone,
+} from "@/database/models/timestamp.model.js";
+
 export type CostCalculationStatus = "running" | "completed" | "failed";
 export type CostCalculationFailureCategory = "calculation_failed";
 
@@ -10,8 +17,8 @@ export interface CostCalculationGenerationRow {
   readonly pricing_content_hash: string;
   readonly calculator_version: string;
   readonly token_unit: bigint;
-  readonly started_at: Date;
-  readonly completed_at: Date | null;
+  readonly started_at: DuckDBTimestampTZValue;
+  readonly completed_at: DuckDBTimestampTZValue | null;
   readonly failure_category: CostCalculationFailureCategory | null;
 }
 
@@ -41,8 +48,8 @@ export function mapCostCalculationGenerationRow(
     pricingContentHash: row.pricing_content_hash,
     calculatorVersion: row.calculator_version,
     tokenUnit: BigInt(row.token_unit),
-    startedAt: new Date(row.started_at),
-    completedAt: row.completed_at === null ? null : new Date(row.completed_at),
+    startedAt: mapTimestampWithTimeZone(row.started_at),
+    completedAt: mapNullableTimestampWithTimeZone(row.completed_at),
     failureCategory: row.failure_category,
   };
 }

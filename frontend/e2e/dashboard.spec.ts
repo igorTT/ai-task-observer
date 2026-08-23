@@ -27,6 +27,40 @@ async function json(route: Route, body: unknown, status = 200) {
 async function installApi(page: Page) {
   await page.route(/^https?:\/\/[^/]+\/api\//u, async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/usage/timeline") {
+      const range =
+        new URL(route.request().url()).searchParams.get("range") === "24h" ? "24h" : "12h";
+      const multiplier = range === "24h" ? 2 : 1;
+      return json(route, {
+        range,
+        bucketUnit: "hour",
+        startAt: "2026-08-22T00:00:00.000Z",
+        endAt: "2026-08-22T12:00:00.000Z",
+        totals: {
+          totalTokens: String(13000 * multiplier),
+          estimatedCostUsd: `0.${12 * multiplier}`,
+          tokenComplete: true,
+          costComplete: true,
+          completeness: { token: "complete", cost: "complete" },
+          warnings: [],
+        },
+        buckets: [
+          {
+            startAt: "2026-08-22T10:00:00.000Z",
+            endAt: "2026-08-22T11:00:00.000Z",
+            totalTokens: String(13000 * multiplier),
+            estimatedCostUsd: `0.${12 * multiplier}`,
+            tokenComplete: true,
+            costComplete: true,
+            completeness: { token: "complete", cost: "complete" },
+            warnings: [],
+          },
+        ],
+        unknownTimeObservationCount: "0",
+        costCoverage: "current",
+        latestCompletedCostGeneration: null,
+      });
+    }
     if (path === "/api/issues/usage")
       return json(route, { items: [{ issue, metrics }], total: "1", limit: 20, offset: 0 });
     if (path === "/api/issues/issue-1/usage")
@@ -121,6 +155,20 @@ async function installApi(page: Page) {
   });
 }
 
+test("overview defaults to 12 hours and switches both metrics to 24 hours", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/overview$/u);
+  await expect(page.getByRole("combobox", { name: "Recent usage range" })).toHaveValue("12h");
+  await expect(page.getByText("13k")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Token consumption" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Estimated cost" })).toBeVisible();
+  await page.getByRole("combobox", { name: "Recent usage range" }).selectOption("24h");
+  await expect(page).toHaveURL(/\/overview\?range=24h$/u);
+  await expect(page.getByText("26k")).toBeVisible();
+  await expect(page.getByText("$0.24")).toBeVisible();
+  await expectNoPageOverflow(page);
+});
+
 async function expectNoPageOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -150,7 +198,7 @@ test("issue overview navigates directly to detail at the support boundary", asyn
   await page.screenshot({ path: testInfo.outputPath("issue-detail.png"), fullPage: true });
 });
 
-test("active status polling stops after a terminal response", async ({ page }) => {
+test("active status does not install periodic requests", async ({ page }) => {
   let statusRequests = 0;
   await page.route(/^https?:\/\/[^/]+\/api\/imports\/status$/u, async (route) => {
     statusRequests += 1;
@@ -176,9 +224,9 @@ test("active status polling stops after a terminal response", async ({ page }) =
     });
   });
   await page.goto("/issues");
-  await expect.poll(() => statusRequests, { timeout: 4000 }).toBe(2);
+  await expect.poll(() => statusRequests, { timeout: 4000 }).toBe(1);
   await page.waitForTimeout(1800);
-  expect(statusRequests).toBe(2);
+  expect(statusRequests).toBe(1);
 });
 
 test("unlinked session requires confirmation and relinks once", async ({ page }) => {

@@ -19,6 +19,9 @@ import { applyMigrations } from "@/database/migrate.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
 import { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
 import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
+import { SessionPhaseAssignmentRepository } from "@/database/repositories/session-phase-assignment-repository.js";
+import { SessionPhaseService } from "@/modules/sessions/session-phase-service.js";
+import { SessionCostRepository } from "@/database/repositories/session-cost-repository.js";
 import { titleFingerprint } from "@/modules/linear/attribution-state.js";
 import { LinearNotConfiguredError } from "@/modules/linear/coordinator.js";
 import type { LinearIssueReader, LinearLookupResult } from "@/modules/linear/domain.js";
@@ -45,6 +48,7 @@ async function setup(reader?: LinearIssueReader) {
   const ingestion = new CodexIngestionRepository(database);
   const issues = new LinearIssueRepository(database.connection);
   const attributions = new LinearSessionAttributionRepository(database.connection);
+  const phases = new SessionPhaseAssignmentRepository(database.connection);
   const relinking = new SessionRelinkService({
     database,
     sessions: ingestion.sessions,
@@ -79,12 +83,12 @@ async function setup(reader?: LinearIssueReader) {
     sessionId: "session-linked",
     titleFingerprint: titleFingerprint("ENG-42: apply"),
     candidateIdentifier: "ENG-42",
-    phase: "apply",
     status: "linked",
     linearId: "issue-42",
     lastAttemptAt: synchronizedAt,
     lastSuccessAt: synchronizedAt,
   });
+  await phases.upsert("session-linked", "apply");
   const zeroCounts = {
     unlinked: 0,
     unconfigured: 0,
@@ -101,7 +105,27 @@ async function setup(reader?: LinearIssueReader) {
         rescan: () =>
           Promise.resolve({ runId: "import-run", state: "queued" as const, coalesced: false }),
       },
-      sessions: new SessionQueryService(ingestion.sessions, ingestion.usage, attributions, issues),
+      sessions: new SessionQueryService(
+        ingestion.sessions,
+        ingestion.usage,
+        attributions,
+        issues,
+        new SessionCostRepository(database.connection),
+        phases,
+      ),
+      phase: new SessionPhaseService({
+        database,
+        sessions: ingestion.sessions,
+        assignments: phases,
+        query: new SessionQueryService(
+          ingestion.sessions,
+          ingestion.usage,
+          attributions,
+          issues,
+          new SessionCostRepository(database.connection),
+          phases,
+        ),
+      }),
       linear: {
         status: () =>
           Promise.resolve({
@@ -128,7 +152,7 @@ async function setup(reader?: LinearIssueReader) {
       },
     },
   });
-  return { app, ingestion, issues, attributions, relinking };
+  return { app, ingestion, issues, attributions, phases, relinking };
 }
 
 function found(identifier: string): LinearLookupResult {
@@ -252,7 +276,6 @@ describe("Linear attribution HTTP contract", () => {
     await opened.attributions.save({
       sessionId: "session-linked",
       titleFingerprint: titleFingerprint("ordinary title"),
-      phase: "apply",
       status: "linked",
       linearId: "issue-42",
     });

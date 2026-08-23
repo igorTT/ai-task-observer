@@ -54,6 +54,11 @@ describe("cost calculation generations", () => {
       estimatedCostUsd: "0.003",
       costComplete: true,
     });
+    expect(firstItems[0]?.observationTime?.toISOString()).toBe("2026-01-15T00:00:00.000Z");
+    expect(firstItems[0]?.priceEffectiveFrom?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    expect(firstItems[0]?.priceEffectiveTo?.toISOString()).toBe("2026-02-01T00:00:00.000Z");
+    expect(first.startedAt.toISOString()).toBe("2026-01-01T00:00:01.000Z");
+    expect(first.completedAt?.toISOString()).toBe("2026-01-01T00:00:02.000Z");
 
     await repository.create({
       generationId: "newer-running",

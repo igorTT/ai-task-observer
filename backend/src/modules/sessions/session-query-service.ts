@@ -3,7 +3,10 @@ import type { CodexSessionRepository } from "@/database/repositories/codex-sessi
 import type { CodexSessionUsageRepository } from "@/database/repositories/codex-session-usage-repository.js";
 import type { LinearIssueRepository } from "@/database/repositories/linear-issue-repository.js";
 import type { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
+import type { SessionCostSummaryRecord } from "@/database/models/session-cost.model.js";
+import type { SessionCostRepository } from "@/database/repositories/session-cost-repository.js";
 import type { SessionAttributionResponse } from "@/api/models/linear-response.js";
+import type { SessionPhaseAssignmentRepository } from "@/database/repositories/session-phase-assignment-repository.js";
 
 export interface SessionView {
   readonly sessionId: string;
@@ -16,6 +19,9 @@ export interface SessionView {
   readonly uncachedInputTokens: string | null;
   readonly outputTokens: string | null;
   readonly totalTokens: string | null;
+  readonly estimatedCostUsd: string | null;
+  readonly costComplete: boolean;
+  readonly pricingGapCodes: readonly string[];
   readonly usageObserved: boolean;
   readonly tokenCompleteness: {
     readonly input: boolean;
@@ -42,6 +48,8 @@ export class SessionQueryService {
     private readonly usage: CodexSessionUsageRepository,
     private readonly attributions?: LinearSessionAttributionRepository,
     private readonly issues?: LinearIssueRepository,
+    private readonly costs?: Pick<SessionCostRepository, "listBySessionIds">,
+    private readonly phases?: SessionPhaseAssignmentRepository,
   ) {}
 
   public async list(limit: number, offset: number): Promise<SessionPage> {
@@ -49,8 +57,16 @@ export class SessionQueryService {
       this.sessions.list(limit, offset),
       this.sessions.count(),
     ]);
+    const costs = this.costs
+      ? await this.costs.listBySessionIds(records.map((record) => record.sessionId))
+      : [];
+    const costsBySessionId = new Map(costs.map((cost) => [cost.sessionId, cost]));
     return {
-      items: await Promise.all(records.map(async (record) => this.#view(record.sessionId))),
+      items: await Promise.all(
+        records.map(async (record) =>
+          this.#view(record.sessionId, costsBySessionId.get(record.sessionId)),
+        ),
+      ),
       total,
       limit,
       offset,
@@ -62,13 +78,15 @@ export class SessionQueryService {
     return session ? this.#view(sessionId) : undefined;
   }
 
-  async #view(sessionId: string): Promise<SessionView> {
-    const [session, usage, attribution] = await Promise.all([
+  async #view(sessionId: string, cost?: SessionCostSummaryRecord): Promise<SessionView> {
+    const [session, usage, attribution, phaseAssignment] = await Promise.all([
       this.sessions.findById(sessionId),
       this.usage.findBySessionId(sessionId),
       this.attributions?.findBySessionId(sessionId),
+      this.phases?.findBySessionId(sessionId),
     ]);
     if (!session) throw new Error("Session disappeared during query");
+    const resolvedCost = cost ?? (await this.costs?.listBySessionIds([sessionId]))?.[0];
     const issue =
       attribution?.linearId && this.issues ? await this.#issue(attribution.linearId) : undefined;
     return {
@@ -82,6 +100,9 @@ export class SessionQueryService {
       uncachedInputTokens: jsonSafeNullable(usage?.uncachedInputTokens),
       outputTokens: jsonSafeNullable(usage?.outputTokens),
       totalTokens: jsonSafeNullable(usage?.totalTokens),
+      estimatedCostUsd: resolvedCost?.estimatedCostUsd ?? null,
+      costComplete: resolvedCost?.costComplete ?? false,
+      pricingGapCodes: resolvedCost?.pricingGapCodes ?? [],
       usageObserved: usage?.usageObserved ?? false,
       tokenCompleteness: usage?.completeness ?? {
         input: false,
@@ -98,7 +119,7 @@ export class SessionQueryService {
             ...(attribution.candidateIdentifier
               ? { candidateIdentifier: attribution.candidateIdentifier }
               : {}),
-            ...(attribution.phase ? { phase: attribution.phase } : {}),
+            ...(phaseAssignment ? { phase: phaseAssignment.phase } : {}),
             ...(issue ? { issue } : {}),
             relinkRequired:
               attribution.status === "linked" &&
@@ -117,7 +138,12 @@ export class SessionQueryService {
               ? { failureCategory: attribution.failureCategory }
               : {}),
           }
-        : { status: "unlinked", relinkRequired: false, synchronizationState: "unlinked" },
+        : {
+            status: "unlinked",
+            ...(phaseAssignment ? { phase: phaseAssignment.phase } : {}),
+            relinkRequired: false,
+            synchronizationState: "unlinked",
+          },
     };
   }
 

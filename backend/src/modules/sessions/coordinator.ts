@@ -47,10 +47,20 @@ export interface IngestionCoordinatorOptions {
   readonly debounceMs: number;
   readonly rediscoveryMs: number;
   readonly watchUsePolling?: boolean;
+  readonly watchFactory?: WatchFactory;
   readonly discover?: (root: string) => Promise<RootDiscoveryStatus>;
   readonly readSessionIndex?: (path: string) => Promise<SessionIndexSnapshot>;
   readonly onSessionsCommitted?: (sessionIds: readonly string[]) => void | Promise<void>;
 }
+
+interface WatchOptions {
+  readonly ignoreInitial: boolean;
+  readonly persistent: boolean;
+  readonly usePolling: boolean;
+  readonly interval: number;
+}
+
+type WatchFactory = (path: string, options: WatchOptions) => FSWatcher;
 
 export class IngestionCoordinator {
   readonly #roots: readonly string[];
@@ -61,6 +71,7 @@ export class IngestionCoordinator {
   readonly #debounceMs: number;
   readonly #rediscoveryMs: number;
   readonly #watchUsePolling: boolean;
+  readonly #watchFactory: WatchFactory;
   readonly #discover: (root: string) => Promise<RootDiscoveryStatus>;
   readonly #readSessionIndex: (path: string) => Promise<SessionIndexSnapshot>;
   readonly #onSessionsCommitted: (sessionIds: readonly string[]) => void | Promise<void>;
@@ -75,6 +86,8 @@ export class IngestionCoordinator {
   #runPromise: Promise<void> | undefined;
   #currentRunId: string | undefined;
   #rediscoveryTimer: NodeJS.Timeout | undefined;
+  #recoveryPromise: Promise<void> | undefined;
+  #recoveryPending = false;
   #indexReconcilePromise: Promise<void> | undefined;
   #indexReconcilePending = false;
 
@@ -87,6 +100,8 @@ export class IngestionCoordinator {
     this.#debounceMs = options.debounceMs;
     this.#rediscoveryMs = options.rediscoveryMs;
     this.#watchUsePolling = options.watchUsePolling ?? false;
+    this.#watchFactory =
+      options.watchFactory ?? ((path, watchOptions) => chokidar.watch(path, watchOptions));
     this.#discover = options.discover ?? discoverRoot;
     this.#readSessionIndex = options.readSessionIndex ?? readSessionIndexSnapshot;
     this.#onSessionsCommitted = options.onSessionsCommitted ?? (() => undefined);
@@ -97,9 +112,12 @@ export class IngestionCoordinator {
     this.#acceptingWork = true;
     await this.#refreshRoots("all", true);
     this.#rediscoveryTimer = setInterval(() => {
-      void this.#refreshRoots("unavailable", false).catch((error: unknown) =>
-        this.#logger.error({ error: errorName(error) }, "Codex root rediscovery failed"),
-      );
+      void this.#requestRecoverySweep().catch((error: unknown) => {
+        this.#logger.warn(
+          { source: "codex-roots", category: "source_failure", error: errorName(error) },
+          "Codex recovery sweep failed",
+        );
+      });
     }, this.#rediscoveryMs);
     this.#rediscoveryTimer.unref();
     await this.#scheduleRun("startup");
@@ -167,6 +185,7 @@ export class IngestionCoordinator {
       (operation): operation is Promise<void> => operation !== undefined,
     );
     await Promise.all(pending);
+    await this.#recoveryPromise;
     await this.#indexReconcilePromise;
   }
 
@@ -197,8 +216,140 @@ export class IngestionCoordinator {
     }
   }
 
+  #requestRecoverySweep(): Promise<void> {
+    if (!this.#acceptingWork) return Promise.resolve();
+    this.#recoveryPending = true;
+    if (this.#recoveryPromise) return this.#recoveryPromise;
+    const operation = this.#runRecoverySweeps();
+    this.#recoveryPromise = operation;
+    const clear = (): void => {
+      if (this.#recoveryPromise === operation) this.#recoveryPromise = undefined;
+    };
+    void operation.then(clear, clear);
+    return operation;
+  }
+
+  async #runRecoverySweeps(): Promise<void> {
+    while (this.#recoveryPending && this.#acceptingWork) {
+      this.#recoveryPending = false;
+      await this.#reconcileRoots();
+    }
+  }
+
+  async #reconcileRoots(): Promise<void> {
+    let availableRoots = 0;
+    let filesDiscovered = 0;
+    let filesQueued = 0;
+    let rootFailures = 0;
+
+    for (const configuredRoot of this.#roots) {
+      if (!this.#acceptingWork) break;
+      let discovered: RootDiscoveryStatus;
+      try {
+        discovered = await this.#discover(configuredRoot);
+      } catch (error) {
+        rootFailures += 1;
+        this.#rootStatus.set(configuredRoot, {
+          root: configuredRoot,
+          available: false,
+          reason: "unreadable",
+          files: [],
+        });
+        await this.#closeRootWatcher(configuredRoot);
+        this.#logger.warn(
+          {
+            source: basename(configuredRoot),
+            category: "source_failure",
+            error: errorName(error),
+          },
+          "Codex recovery root discovery failed",
+        );
+        continue;
+      }
+
+      this.#rootStatus.set(configuredRoot, discovered);
+      if (!discovered.available) {
+        rootFailures += 1;
+        await this.#closeRootWatcher(configuredRoot);
+        this.#logger.warn(
+          {
+            source: basename(configuredRoot),
+            category: "source_failure",
+            reason: discovered.reason ?? "unavailable",
+          },
+          "Codex recovery root unavailable",
+        );
+        continue;
+      }
+
+      if (!this.#watchers.has(configuredRoot)) {
+        try {
+          await this.#watch(configuredRoot, discovered.root);
+          if (!this.#acceptingWork) break;
+          discovered = await this.#discover(configuredRoot);
+          this.#rootStatus.set(configuredRoot, discovered);
+        } catch (error) {
+          rootFailures += 1;
+          this.#rootStatus.set(configuredRoot, {
+            root: configuredRoot,
+            available: false,
+            reason: "unreadable",
+            files: [],
+          });
+          await this.#closeRootWatcher(configuredRoot);
+          this.#logger.warn(
+            {
+              source: basename(configuredRoot),
+              category: "source_failure",
+              error: errorName(error),
+            },
+            "Codex recovery root watch failed",
+          );
+          continue;
+        }
+        if (!discovered.available) {
+          rootFailures += 1;
+          await this.#closeRootWatcher(configuredRoot);
+          this.#logger.warn(
+            {
+              source: basename(configuredRoot),
+              category: "source_failure",
+              reason: discovered.reason ?? "unavailable",
+            },
+            "Codex recovery root unavailable after watch",
+          );
+          continue;
+        }
+      }
+
+      availableRoots += 1;
+      filesDiscovered += discovered.files.length;
+      for (const path of discovered.files) {
+        this.#enqueue(discovered.root, path);
+        filesQueued += 1;
+      }
+    }
+
+    this.#logger.debug(
+      {
+        roots: this.#roots.length,
+        availableRoots,
+        filesDiscovered,
+        filesQueued,
+        rootFailures,
+      },
+      "Codex recovery sweep completed",
+    );
+  }
+
+  async #closeRootWatcher(configuredRoot: string): Promise<void> {
+    const watcher = this.#watchers.get(configuredRoot);
+    this.#watchers.delete(configuredRoot);
+    await watcher?.close();
+  }
+
   async #watch(configuredRoot: string, canonicalRoot: string): Promise<void> {
-    const watcher = chokidar.watch(canonicalRoot, {
+    const watcher = this.#watchFactory(canonicalRoot, {
       ignoreInitial: true,
       persistent: true,
       usePolling: this.#watchUsePolling,
@@ -218,15 +369,22 @@ export class IngestionCoordinator {
         reason: "unreadable",
         files: [],
       });
-      this.#logger.warn({ error: errorName(error), root: configuredRoot }, "Codex watcher failed");
+      this.#logger.warn(
+        { error: errorName(error), source: basename(configuredRoot), category: "source_failure" },
+        "Codex watcher failed",
+      );
     });
     await new Promise<void>((resolveReady) => watcher.once("ready", resolveReady));
+    if (!this.#acceptingWork) {
+      await watcher.close();
+      return;
+    }
     this.#watchers.set(configuredRoot, watcher);
   }
 
   async #watchSessionIndex(): Promise<void> {
     if (this.#sessionIndexWatcher) return;
-    const watcher = chokidar.watch(this.#sessionIndexPath, {
+    const watcher = this.#watchFactory(this.#sessionIndexPath, {
       ignoreInitial: true,
       persistent: true,
       usePolling: this.#watchUsePolling,
@@ -376,7 +534,9 @@ export class IngestionCoordinator {
 
   #enqueue(root: string, path: string, runId?: string): void {
     if (!this.#acceptingWork) return;
-    this.#pending.set(path, { root, ...(runId ? { runId } : {}) });
+    const previous = this.#pending.get(path);
+    const effectiveRunId = runId ?? previous?.runId;
+    this.#pending.set(path, { root, ...(effectiveRunId ? { runId: effectiveRunId } : {}) });
     void this.#drain();
   }
 

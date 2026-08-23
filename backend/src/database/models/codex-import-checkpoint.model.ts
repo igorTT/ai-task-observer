@@ -1,3 +1,6 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type { ImportCheckpoint, ImportState } from "@/modules/sessions/domain.js";
 
 export interface CodexImportCheckpointRow {
@@ -12,7 +15,7 @@ export interface CodexImportCheckpointRow {
   readonly unknown_records: number;
   readonly malformed_records: number;
   readonly last_error: string | null;
-  readonly updated_at: Date;
+  readonly updated_at: DuckDBTimestampTZValue;
 }
 
 export function mapCheckpointRow(row: CodexImportCheckpointRow): ImportCheckpoint {
@@ -28,6 +31,6 @@ export function mapCheckpointRow(row: CodexImportCheckpointRow): ImportCheckpoin
     unknownRecords: Number(row.unknown_records),
     malformedRecords: Number(row.malformed_records),
     ...(row.last_error === null ? {} : { lastError: row.last_error }),
-    updatedAt: new Date(row.updated_at),
+    updatedAt: mapTimestampWithTimeZone(row.updated_at),
   };
 }

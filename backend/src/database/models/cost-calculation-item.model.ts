@@ -1,5 +1,6 @@
-import type { DuckDBDecimalValue } from "@duckdb/node-api";
+import type { DuckDBDecimalValue, DuckDBTimestampTZValue } from "@duckdb/node-api";
 
+import { mapNullableTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import { parseFixedDecimal, serializeDecimal } from "@/modules/pricing/domain.js";
 
 export interface CostCalculationItemRow {
@@ -10,10 +11,10 @@ export interface CostCalculationItemRow {
   readonly source_identity: string;
   readonly source_record_number: bigint;
   readonly observed_model: string;
-  readonly observation_time: Date | null;
+  readonly observation_time: DuckDBTimestampTZValue | null;
   readonly canonical_model: string | null;
-  readonly price_effective_from: Date | null;
-  readonly price_effective_to: Date | null;
+  readonly price_effective_from: DuckDBTimestampTZValue | null;
+  readonly price_effective_to: DuckDBTimestampTZValue | null;
   readonly uncached_input_rate: DuckDBDecimalValue | null;
   readonly cached_input_rate: DuckDBDecimalValue | null;
   readonly output_rate: DuckDBDecimalValue | null;
@@ -65,11 +66,10 @@ export function mapCostCalculationItemRow(row: CostCalculationItemRow): CostCalc
     sourceIdentity: row.source_identity,
     sourceRecordNumber: BigInt(row.source_record_number),
     observedModel: row.observed_model,
-    observationTime: row.observation_time === null ? null : new Date(row.observation_time),
+    observationTime: mapNullableTimestampWithTimeZone(row.observation_time),
     canonicalModel: row.canonical_model,
-    priceEffectiveFrom:
-      row.price_effective_from === null ? null : new Date(row.price_effective_from),
-    priceEffectiveTo: row.price_effective_to === null ? null : new Date(row.price_effective_to),
+    priceEffectiveFrom: mapNullableTimestampWithTimeZone(row.price_effective_from),
+    priceEffectiveTo: mapNullableTimestampWithTimeZone(row.price_effective_to),
     uncachedInputRate: decimalString(row.uncached_input_rate),
     cachedInputRate: decimalString(row.cached_input_rate),
     outputRate: decimalString(row.output_rate),

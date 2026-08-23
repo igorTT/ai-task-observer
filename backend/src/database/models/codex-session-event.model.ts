@@ -1,3 +1,6 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapNullableTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type {
   MessageRole,
   SelectedEventKind,
@@ -12,7 +15,7 @@ export interface CodexSessionEventRow {
   readonly source_record_number: bigint;
   readonly event_kind: SelectedEventKind;
   readonly message_role: MessageRole | null;
-  readonly event_time: Date | null;
+  readonly event_time: DuckDBTimestampTZValue | null;
   readonly message_content: string | null;
   readonly parser_version: number;
 }
@@ -26,7 +29,7 @@ export function mapSessionEventRow(row: CodexSessionEventRow): SelectedSessionEv
     sourceRecordNumber: BigInt(row.source_record_number),
     kind: row.event_kind,
     messageRole: row.message_role,
-    eventTime: row.event_time === null ? null : new Date(row.event_time),
+    eventTime: mapNullableTimestampWithTimeZone(row.event_time),
     messageContent: row.message_content,
     parserVersion: Number(row.parser_version),
   };

@@ -12,7 +12,7 @@ import type {
   UsageObservation,
 } from "@/modules/sessions/domain.js";
 
-export const CODEX_PARSER_VERSION = 3;
+export const CODEX_PARSER_VERSION = 4;
 
 type JsonObject = Record<string, unknown>;
 
@@ -176,6 +176,30 @@ export function parseCodexRecords(lines: readonly string[], context: ParserConte
               payload.message,
             ),
           );
+        } else if (
+          parserVersion >= 4 &&
+          payload.type === "item_completed" &&
+          sessionId &&
+          isObject(payload.item) &&
+          payload.item.type === "UserMessage" &&
+          Array.isArray(payload.item.content)
+        ) {
+          const content = permittedMessageContent(payload.item.content);
+          if (content) {
+            events.push(
+              selectedEvent(
+                sessionId,
+                context.sourcePath,
+                sourceIdentity,
+                recordNumber,
+                "user_message",
+                eventTime,
+                parserVersion,
+                "user",
+                content,
+              ),
+            );
+          }
         } else if (
           payload.type === "agent_message" &&
           sessionId &&

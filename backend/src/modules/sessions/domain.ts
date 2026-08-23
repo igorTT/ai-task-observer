@@ -1,6 +1,8 @@
 export type ImportState = "pending" | "importing" | "ready" | "stale" | "failed";
 export type ImportRunState = "queued" | "running" | "completed" | "failed";
 export type ImportTrigger = "startup" | "watch" | "rescan" | "rediscovery";
+export type SessionPhase =
+  "research" | "explore" | "proposal" | "apply" | "verify" | "quick-flow" | "other";
 
 export interface TokenValues {
   readonly input: bigint;

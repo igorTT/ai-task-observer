@@ -1,5 +1,6 @@
 import type { UsageMetricsResponse } from "@/api/generated/api";
-import { Badge } from "@/components/ui/badge";
+import { WarningBadge } from "@/components/ui/warning-badge";
+import { getUsageWarningDescription } from "@/features/issues/usage-warning-descriptions";
 import {
   formatCode,
   formatCompactTokenCount,
@@ -32,22 +33,35 @@ export function MetricGrid({ metrics }: { metrics: UsageMetricsResponse }) {
 }
 
 export function MetricState({ metrics }: { metrics: UsageMetricsResponse }) {
-  const warnings = [...metrics.anomalyCodes, ...metrics.pricingGapCodes];
+  const warnings = [
+    ...(metrics.tokenComplete ? [] : ["partial_tokens"]),
+    ...(metrics.costComplete
+      ? []
+      : [metrics.estimatedCostUsd === null ? "cost_unavailable" : "partial_estimate"]),
+    ...metrics.anomalyCodes,
+    ...metrics.pricingGapCodes,
+  ];
+  const distinctWarnings = [...new Set(warnings)];
+  if (distinctWarnings.length === 0) return null;
+
   return (
     <div className="flex flex-wrap gap-2">
-      <Badge className={metrics.tokenComplete ? "text-emerald-700" : "text-amber-800"}>
-        {metrics.tokenComplete ? "Tokens complete" : "Partial tokens"}
-      </Badge>
-      <Badge className={metrics.costComplete ? "text-emerald-700" : "text-amber-800"}>
-        {metrics.costComplete ? "Cost complete" : "Partial estimate"}
-      </Badge>
-      {warnings.map((code) => (
-        <Badge className="text-amber-800" key={code}>
-          {formatCode(code)}
-        </Badge>
+      {distinctWarnings.map((code) => (
+        <WarningBadge
+          key={code}
+          label={warningLabel(code)}
+          description={getUsageWarningDescription(code)}
+        />
       ))}
     </div>
   );
+}
+
+function warningLabel(code: string): string {
+  if (code === "partial_tokens") return "Partial tokens";
+  if (code === "partial_estimate") return "Partial estimate";
+  if (code === "cost_unavailable") return "Cost unavailable";
+  return formatCode(code);
 }
 
 export function CompactMetrics({ metrics }: { metrics: UsageMetricsResponse }) {

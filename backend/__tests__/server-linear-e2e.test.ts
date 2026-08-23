@@ -94,9 +94,13 @@ test("imports a renamed historical session and preserves durable attribution acr
       expect((attributed.body as SessionResponse).attribution).toMatchObject({
         status: "linked",
         candidateIdentifier: "ENG-77",
-        phase: "apply",
         issue: { id: "linear-77", title: "Durable attribution" },
       });
+      const assigned = await request(first.httpServer)
+        .put("/api/sessions/durable-session/phase")
+        .send({ phase: "apply" });
+      expect(assigned.status).toBe(200);
+      expect((assigned.body as SessionResponse).attribution).toMatchObject({ phase: "apply" });
       expect(JSON.stringify(attributed.body)).not.toContain("lin_api_fixture_key");
     } finally {
       await first.close();
@@ -113,6 +117,7 @@ test("imports a renamed historical session and preserves durable attribution acr
       expect((durable.body as SessionResponse).attribution).toMatchObject({
         status: "linked",
         candidateIdentifier: "ENG-77",
+        phase: "apply",
         issue: { id: "linear-77" },
       });
       expect(findIssue).toHaveBeenCalledTimes(callsAfterFirstRun);

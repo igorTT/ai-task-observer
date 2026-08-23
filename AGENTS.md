@@ -53,3 +53,11 @@ only DuckDB writer and Linear access must remain read-only. For the internal POC
 user and assistant message content may be persisted only in structured session-event rows. Never
 persist or expose reasoning, tool arguments/results, credentials, opaque raw records, malformed
 payloads, or message transcripts through APIs or diagnostics.
+
+<!-- CARTODEX:START -->
+## Cartodex Map
+
+This repository can be navigated with the generated Cartodex map at [docs/CARTODEX_MAP.md](docs/CARTODEX_MAP.md).
+
+When you need architecture, module ownership, data flow, conventions, or common change paths, read that map before broad code exploration. If the map is missing or stale, ask Codex to use Cartodex to map or update this codebase.
+<!-- CARTODEX:END -->

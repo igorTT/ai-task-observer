@@ -10,6 +10,7 @@ import { createApp } from "@/app.js";
 import { AppDatabase } from "@/database/database.js";
 import { applyMigrations } from "@/database/migrate.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
+import { SessionCostRepository } from "@/database/repositories/session-cost-repository.js";
 import type { IngestionStatusSnapshot, RescanResult } from "@/modules/sessions/coordinator.js";
 import { SessionQueryService } from "@/modules/sessions/session-query-service.js";
 import type { SessionPageResponse, SessionResponse } from "@/api/models/session-response.js";
@@ -21,6 +22,7 @@ const databases: AppDatabase[] = [];
 
 async function setup(): Promise<{
   app: ReturnType<typeof createApp>;
+  database: AppDatabase;
   repository: CodexIngestionRepository;
 }> {
   const directory = await mkdtemp(join(tmpdir(), "codex-api-"));
@@ -54,7 +56,13 @@ async function setup(): Promise<{
       logger,
       api: {
         ingestion,
-        sessions: new SessionQueryService(repository.sessions, repository.usage),
+        sessions: new SessionQueryService(
+          repository.sessions,
+          repository.usage,
+          undefined,
+          undefined,
+          new SessionCostRepository(database.connection),
+        ),
         linear: {
           status: () =>
             Promise.resolve({
@@ -75,6 +83,7 @@ async function setup(): Promise<{
         },
       },
     }),
+    database,
     repository,
   };
 }
@@ -163,6 +172,138 @@ describe("session and import HTTP contract", () => {
       ]) {
         expect(serialized).not.toContain(forbidden);
       }
+    });
+  });
+
+  test("returns complete, partial, unavailable, and zero cost states consistently in list and detail", async () => {
+    const opened = await setup();
+    for (const id of [
+      "priced-complete",
+      "priced-partial",
+      "priced-unavailable",
+      "priced-no-usage",
+    ]) {
+      await opened.repository.sessions.upsert(
+        {
+          sessionId: id,
+          sourceRoot: "/private/root",
+          sourcePath: `/private/root/${id}.jsonl`,
+        },
+        3,
+      );
+      await opened.repository.usage.ensure(id);
+    }
+    await opened.database.connection.run(`
+      INSERT INTO codex_usage_observations (
+        observation_id, session_id, source_path, source_identity, source_record_number,
+        parser_version, model, event_time, normalized_input, normalized_cached_input,
+        normalized_uncached_input, normalized_output, normalized_total,
+        normalization_epoch, normalization_method, complete, anomaly_codes, legacy
+      ) VALUES
+        ('http-complete-observation', 'priced-complete', '/private/root/complete.jsonl', 'complete', 1,
+          3, 'gpt-test', '2026-08-01 10:00:00', 100, 20, 80, 10, 110, 0,
+          'standalone_delta', true, '[]', false),
+        ('http-partial-known', 'priced-partial', '/private/root/partial.jsonl', 'partial', 1,
+          3, 'gpt-test', '2026-08-01 10:00:00', 100, 20, 80, 10, 110, 0,
+          'standalone_delta', true, '[]', false),
+        ('http-partial-gap', 'priced-partial', '/private/root/partial.jsonl', 'partial', 2,
+          3, 'unknown-model', NULL, 20, NULL, NULL, 2, 22, 0,
+          'reset_incomplete', false, '["cached_exceeds_input"]', false),
+        ('http-unavailable-observation', 'priced-unavailable', '/private/root/unavailable.jsonl', 'unavailable', 1,
+          3, 'gpt-test', '2026-08-01 10:00:00', 100, 20, 80, 10, 110, 0,
+          'standalone_delta', true, '[]', false);
+
+      INSERT INTO cost_calculation_generations VALUES
+        ('http-generation', 'http-revision', 'completed', 1, 'catalog', 'hash',
+          '1', 1000000, '2026-08-02 00:00:00', '2026-08-02 00:00:01', NULL);
+
+      INSERT INTO cost_calculation_items (
+        generation_id, observation_id, session_id, source_path, source_identity,
+        source_record_number, observed_model, observation_time, canonical_model,
+        uncached_input_tokens, cached_input_tokens, output_tokens,
+        estimated_cost_usd, cost_complete, gap_codes, anomaly_codes
+      ) VALUES
+        ('http-generation', 'http-complete-observation', 'priced-complete', '/private/root/complete.jsonl', 'complete', 1,
+          'gpt-test', '2026-08-01 10:00:00', 'gpt-test', 80, 20, 10,
+          0.125000000000000000000000, true, '[]', '[]'),
+        ('http-generation', 'http-partial-known', 'priced-partial', '/private/root/partial.jsonl', 'partial', 1,
+          'gpt-test', '2026-08-01 10:00:00', 'gpt-test', 80, 20, 10,
+          0.250000000000000000000000, true, '[]', '[]'),
+        ('http-generation', 'http-partial-gap', 'priced-partial', '/private/root/partial.jsonl', 'partial', 2,
+          'unknown-model', NULL, NULL, NULL, NULL, 2,
+          NULL, false, '["unknown_model","cached_input_unavailable"]', '["cached_exceeds_input"]');
+    `);
+
+    await withApp(opened.app, async (app) => {
+      const page = await request(app).get("/api/sessions?limit=100&offset=0");
+      expect(page.status).toBe(200);
+      const items = Object.fromEntries(
+        (page.body as SessionPageResponse).items.map((item) => [item.sessionId, item]),
+      );
+      expect(items["priced-complete"]).toMatchObject({
+        estimatedCostUsd: "0.125",
+        costComplete: true,
+        pricingGapCodes: [],
+      });
+      expect(items["priced-partial"]).toMatchObject({
+        estimatedCostUsd: "0.25",
+        costComplete: false,
+        pricingGapCodes: ["cached_input_unavailable", "unknown_model"],
+      });
+      expect(items["priced-unavailable"]).toMatchObject({
+        estimatedCostUsd: null,
+        costComplete: false,
+        pricingGapCodes: ["uncovered_generation"],
+      });
+      expect(items["priced-no-usage"]).toMatchObject({
+        estimatedCostUsd: null,
+        costComplete: false,
+        pricingGapCodes: [],
+      });
+
+      const detail = await request(app).get("/api/sessions/priced-partial");
+      expect(detail.status).toBe(200);
+      expect(detail.body).toMatchObject({
+        estimatedCostUsd: items["priced-partial"]?.estimatedCostUsd,
+        costComplete: items["priced-partial"]?.costComplete,
+        pricingGapCodes: items["priced-partial"]?.pricingGapCodes,
+      });
+    });
+  });
+
+  test("returns uncovered generation for normalized usage when no generation is complete", async () => {
+    const opened = await setup();
+    await opened.repository.sessions.upsert(
+      {
+        sessionId: "no-completed-generation",
+        sourceRoot: "/private/root",
+        sourcePath: "/private/root/no-completed-generation.jsonl",
+      },
+      3,
+    );
+    await opened.repository.usage.ensure("no-completed-generation");
+    await opened.database.connection.run(`
+      INSERT INTO codex_usage_observations (
+        observation_id, session_id, source_path, source_identity, source_record_number,
+        parser_version, model, normalized_input, normalized_cached_input,
+        normalized_uncached_input, normalized_output, normalized_total,
+        normalization_epoch, normalization_method, complete, anomaly_codes, legacy
+      ) VALUES (
+        'no-generation-observation', 'no-completed-generation', '/private/root/no-completed-generation.jsonl',
+        'no-generation', 1, 3, 'gpt-test', 10, 2, 8, 1, 11, 0,
+        'standalone_delta', true, '[]', false
+      )
+    `);
+
+    await withApp(opened.app, async (app) => {
+      const detail = await request(app).get("/api/sessions/no-completed-generation");
+      expect(detail.status).toBe(200);
+      expect(detail.body).toMatchObject({
+        estimatedCostUsd: null,
+        costComplete: false,
+        pricingGapCodes: ["uncovered_generation"],
+        inputTokens: null,
+      });
     });
   });
 

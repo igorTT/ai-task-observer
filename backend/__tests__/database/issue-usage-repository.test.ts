@@ -94,7 +94,6 @@ describe("IssueUsageRepository", () => {
       sessionId: "session-a",
       titleFingerprint: "new-title",
       candidateIdentifier: "ENG-2",
-      phase: "explore",
       status: "linked",
       linearId: "issue-1",
     });
@@ -107,7 +106,6 @@ describe("IssueUsageRepository", () => {
       sessionId: "session-a",
       titleFingerprint: "new-title",
       candidateIdentifier: "ENG-2",
-      phase: "explore",
       status: "linked",
       linearId: "issue-2",
     });
@@ -126,7 +124,6 @@ describe("IssueUsageRepository", () => {
       sessionId: "session-b",
       titleFingerprint: "move-last-session",
       candidateIdentifier: "ENG-2",
-      phase: "apply",
       status: "linked",
       linearId: "issue-2",
     });
@@ -154,6 +151,27 @@ describe("IssueUsageRepository", () => {
     const withoutCompletedGeneration = await repository.findIssue("issue-1");
     expect(withoutCompletedGeneration?.metrics.estimatedCostUsd).toBeNull();
     expect(withoutCompletedGeneration?.metrics.costComplete).toBe(false);
+  });
+
+  test("assigns a UTC-midnight boundary to the source UTC calendar day", async () => {
+    fixture = await createIssueUsageFixture();
+    await fixture.database.connection.run(`
+      INSERT INTO codex_session_events (
+        event_id, session_id, source_path, source_identity, source_record_number,
+        event_kind, message_role, event_time, message_content, parser_version
+      ) VALUES (
+        'turn-utc-boundary', 'session-a', '/root/a.jsonl', 'a', 20,
+        'user_message', 'user', '2026-08-01T23:30:00.000Z', 'selected', 2
+      )
+    `);
+
+    const daily = await new IssueUsageRepository(fixture.database.connection).listDaily("issue-1");
+    expect(daily.map((bucket) => bucket.date?.toISOString().slice(0, 10) ?? null)).toEqual([
+      "2026-08-01",
+      "2026-08-02",
+      null,
+    ]);
+    expect(daily.map((bucket) => bucket.metrics.developerTurns)).toEqual([4n, 1n, 0n]);
   });
 });
 

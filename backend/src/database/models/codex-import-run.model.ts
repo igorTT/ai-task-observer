@@ -1,11 +1,14 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type { ImportRun, ImportRunState, ImportTrigger } from "@/modules/sessions/domain.js";
 
 export interface CodexImportRunRow {
   readonly run_id: string;
   readonly trigger: ImportTrigger;
   readonly state: ImportRunState;
-  readonly started_at: Date | null;
-  readonly completed_at: Date | null;
+  readonly started_at: DuckDBTimestampTZValue | null;
+  readonly completed_at: DuckDBTimestampTZValue | null;
   readonly roots_discovered: number;
   readonly files_discovered: number;
   readonly files_imported: number;
@@ -20,8 +23,10 @@ export function mapImportRunRow(row: CodexImportRunRow): ImportRun {
     runId: row.run_id,
     trigger: row.trigger,
     state: row.state,
-    ...(row.started_at === null ? {} : { startedAt: new Date(row.started_at) }),
-    ...(row.completed_at === null ? {} : { completedAt: new Date(row.completed_at) }),
+    ...(row.started_at === null ? {} : { startedAt: mapTimestampWithTimeZone(row.started_at) }),
+    ...(row.completed_at === null
+      ? {}
+      : { completedAt: mapTimestampWithTimeZone(row.completed_at) }),
     rootsDiscovered: Number(row.roots_discovered),
     filesDiscovered: Number(row.files_discovered),
     filesImported: Number(row.files_imported),

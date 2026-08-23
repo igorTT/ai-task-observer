@@ -9,8 +9,8 @@ import { PageHeading, PageLoading, RequestError } from "@/features/issues/issue-
 import { normalizeApiError } from "@/lib/api-error";
 import {
   formatCompactTokenCount,
+  formatDateTime,
   formatNullableCount,
-  formatUtcDate,
   formatUsd,
 } from "@/lib/formatters";
 
@@ -49,7 +49,7 @@ export function IssueDetailPage() {
           <h2 className="text-xl font-semibold">{issue.title}</h2>
           <p className="mt-1 text-sm text-slate-600">
             {generation
-              ? `Cost generation ${generation.generationId} · ${formatUtcDate(generation.completedAt)}`
+              ? `Cost generation ${generation.generationId} · ${formatDateTime(generation.completedAt)}`
               : "No completed cost generation"}
           </p>
         </div>
@@ -80,7 +80,7 @@ export function IssueDetailPage() {
           </div>,
           session.phase ?? "No phase",
           session.importState,
-          `${formatUtcDate(session.startedAt)} – ${formatUtcDate(session.endedAt)}`,
+          `${formatDateTime(session.startedAt)} – ${formatDateTime(session.endedAt)}`,
           formatCompactTokenCount(session.metrics.totalTokens),
           <div key="cost">
             {formatUsd(session.metrics.estimatedCostUsd)}

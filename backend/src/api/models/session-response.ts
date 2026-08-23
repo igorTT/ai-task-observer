@@ -11,6 +11,9 @@ export interface SessionResponse {
   readonly uncachedInputTokens: string | null;
   readonly outputTokens: string | null;
   readonly totalTokens: string | null;
+  readonly estimatedCostUsd: string | null;
+  readonly costComplete: boolean;
+  readonly pricingGapCodes: readonly string[];
   readonly usageObserved: boolean;
   readonly tokenCompleteness: TokenCompletenessResponse;
   readonly usageAnomalies: readonly string[];

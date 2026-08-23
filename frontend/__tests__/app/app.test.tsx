@@ -11,6 +11,25 @@ describe("application shell", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       await Promise.resolve();
       const url = input instanceof Request ? input.url : input.toString();
+      if (url.includes("/api/usage/timeline"))
+        return Response.json({
+          range: "12h",
+          bucketUnit: "hour",
+          startAt: "2026-08-22T00:00:00.000Z",
+          endAt: "2026-08-22T12:00:00.000Z",
+          totals: {
+            totalTokens: "0",
+            estimatedCostUsd: "0",
+            tokenComplete: true,
+            costComplete: true,
+            completeness: { token: "complete", cost: "complete" },
+            warnings: [],
+          },
+          buckets: [],
+          unknownTimeObservationCount: "0",
+          costCoverage: "missing",
+          latestCompletedCostGeneration: null,
+        });
       if (url.includes("/api/issues/usage"))
         return Response.json({ items: [], total: "0", limit: 20, offset: 0 });
       if (url.includes("/api/imports/status"))
@@ -42,13 +61,14 @@ describe("application shell", () => {
   test("renders the initial route with the Redux provider", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/"] });
     const view = render(<App router={router} store={createAppStore()} />);
-    expect(view.getByRole("heading", { name: "Issue usage" })).toBeTruthy();
+    expect(view.getByRole("heading", { name: "Recent usage" })).toBeTruthy();
     expect(view.getByText("AI Task Observer")).toBeTruthy();
     expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
-    expect(view.getByRole("link", { name: "Issues" }).getAttribute("aria-current")).toBe("page");
+    expect(view.getByRole("link", { name: "Overview" }).getAttribute("aria-current")).toBe("page");
+    expect(view.getByRole("link", { name: "Issues" })).toBeTruthy();
     expect(view.getByRole("link", { name: "Sessions" })).toBeTruthy();
     expect(view.queryByRole("button", { name: "Toggle navigation" })).toBeNull();
-    expect(router.state.location.pathname).toBe("/issues");
+    expect(router.state.location.pathname).toBe("/overview");
   });
 
   test("does not expose a density preference control", () => {

@@ -1,3 +1,7 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
+
 export interface CodexSessionUsageRow {
   readonly session_id: string;
   readonly input_tokens: bigint | null;
@@ -13,7 +17,7 @@ export interface CodexSessionUsageRow {
   readonly total_complete: boolean;
   readonly anomaly_codes: string;
   readonly fact_revision: bigint;
-  readonly updated_at: Date;
+  readonly updated_at: DuckDBTimestampTZValue;
 }
 
 export interface CodexSessionUsageRecord {
@@ -54,7 +58,7 @@ export function mapUsageRow(row: CodexSessionUsageRow): CodexSessionUsageRecord 
     },
     anomalyCodes: JSON.parse(row.anomaly_codes) as string[],
     factRevision: BigInt(row.fact_revision),
-    updatedAt: new Date(row.updated_at),
+    updatedAt: mapTimestampWithTimeZone(row.updated_at),
   };
 }
 

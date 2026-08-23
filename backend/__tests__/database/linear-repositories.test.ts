@@ -59,7 +59,6 @@ describe("Linear attribution repositories", () => {
       sessionId: "session-'safe",
       titleFingerprint: "fingerprint",
       candidateIdentifier: "ENG-42",
-      phase: "apply",
       status: "linked",
       linearId: "linear-'safe",
       lastAttemptAt: synchronizedAt,
@@ -77,13 +76,13 @@ describe("Linear attribution repositories", () => {
 
     expect(await issues.findByIdentifier("ENG-42")).toMatchObject({
       linearId: "linear-'safe",
-      team: { key: "ENG" },
+      updatedAt: new Date("2026-08-09T09:00:00.000Z"),
       syncedAt: synchronizedAt,
+      team: { key: "ENG" },
     });
     expect(await attributions.findBySessionId("session-'safe")).toMatchObject({
       status: "linked",
       candidateIdentifier: "ENG-42",
-      phase: "apply",
     });
     await attributions.save({
       sessionId: "session-'safe",
@@ -111,11 +110,14 @@ describe("Linear attribution repositories", () => {
       (await attributions.findBySessionId("session-'safe"))?.candidateIdentifier,
     ).toBeUndefined();
     expect(await attributions.counts()).toMatchObject({ linked: 1, unlinked: 0 });
-    expect(await runs.latestCompleted()).toMatchObject({
+    const completedRun = await runs.latestCompleted();
+    expect(completedRun).toMatchObject({
       runId: "run-'safe",
       state: "completed",
       linkedCount: 1,
     });
+    expect(completedRun?.startedAt).toBeInstanceOf(Date);
+    expect(completedRun?.completedAt).toBeInstanceOf(Date);
   });
 
   test("refreshes an issue after one session references it and links a second session", async () => {

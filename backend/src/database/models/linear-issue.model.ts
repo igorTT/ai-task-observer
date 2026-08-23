@@ -1,3 +1,6 @@
+import type { DuckDBTimestampTZValue } from "@duckdb/node-api";
+
+import { mapTimestampWithTimeZone } from "@/database/models/timestamp.model.js";
 import type { CachedLinearIssue } from "@/modules/linear/domain.js";
 
 export interface LinearIssueRow {
@@ -10,8 +13,8 @@ export interface LinearIssueRow {
   readonly team_name: string;
   readonly state_id: string;
   readonly state_name: string;
-  readonly linear_updated_at: Date;
-  readonly synced_at: Date;
+  readonly linear_updated_at: DuckDBTimestampTZValue;
+  readonly synced_at: DuckDBTimestampTZValue;
 }
 
 export function mapLinearIssueRow(row: LinearIssueRow): CachedLinearIssue {
@@ -22,7 +25,7 @@ export function mapLinearIssueRow(row: LinearIssueRow): CachedLinearIssue {
     url: row.url,
     team: { id: row.team_id, key: row.team_key, name: row.team_name },
     state: { id: row.state_id, name: row.state_name },
-    updatedAt: new Date(row.linear_updated_at),
-    syncedAt: new Date(row.synced_at),
+    updatedAt: mapTimestampWithTimeZone(row.linear_updated_at),
+    syncedAt: mapTimestampWithTimeZone(row.synced_at),
   };
 }

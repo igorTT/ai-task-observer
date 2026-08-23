@@ -21,6 +21,25 @@ describe("dashboard API cache tags", () => {
         return Response.json({ items: [], total: 0, limit: 20, offset: 0 });
       if (url.includes("/api/issues/usage"))
         return Response.json({ items: [], total: "0", limit: 20, offset: 0 });
+      if (url.includes("/api/usage/timeline"))
+        return Response.json({
+          range: "12h",
+          bucketUnit: "hour",
+          startAt: "2026-08-22T00:00:00.000Z",
+          endAt: "2026-08-22T12:00:00.000Z",
+          totals: {
+            totalTokens: "0",
+            estimatedCostUsd: "0",
+            tokenComplete: true,
+            costComplete: true,
+            completeness: { token: "complete", cost: "complete" },
+            warnings: [],
+          },
+          buckets: [],
+          unknownTimeObservationCount: "0",
+          costCoverage: "missing",
+          latestCompletedCostGeneration: null,
+        });
       return Response.json({
         configured: false,
         state: "unconfigured",
@@ -52,5 +71,17 @@ describe("dashboard API cache tags", () => {
     expect(requests.filter((url) => url.includes("/api/linear/status")).length).toBe(2);
     expect(relinkBody).toEqual({ issueIdentifier: "ENG-215" });
     subscriptions.forEach((subscription) => subscription.unsubscribe());
+  });
+
+  test("rescan and cost recalculation refresh the subscribed timeline", async () => {
+    const store = createAppStore();
+    const timeline = store.dispatch(dashboardApi.endpoints.timeline.initiate({ range: "12h" }));
+    await timeline.unwrap();
+    await store.dispatch(dashboardApi.endpoints.rescan.initiate()).unwrap();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await store.dispatch(dashboardApi.endpoints.recalculateCosts.initiate()).unwrap();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requests.filter((url) => url.includes("/api/usage/timeline")).length).toBe(3);
+    timeline.unsubscribe();
   });
 });

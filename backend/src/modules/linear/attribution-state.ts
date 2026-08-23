@@ -32,7 +32,6 @@ export function stateForCurrentTitle(input: {
       ...(parsed.kind === "candidate"
         ? {
             candidateIdentifier: parsed.candidateIdentifier,
-            ...(parsed.phase ? { phase: parsed.phase } : {}),
           }
         : {}),
       status: "linked",
@@ -58,7 +57,6 @@ export function stateForCurrentTitle(input: {
     sessionId: input.sessionId,
     titleFingerprint: fingerprint,
     candidateIdentifier: parsed.candidateIdentifier,
-    ...(parsed.phase ? { phase: parsed.phase } : {}),
     status: input.configured ? "pending" : "unconfigured",
     updatedAt,
   };
@@ -74,7 +72,6 @@ export function stateForLookupResult(
       sessionId: current.sessionId,
       titleFingerprint: current.titleFingerprint,
       ...(current.candidateIdentifier ? { candidateIdentifier: current.candidateIdentifier } : {}),
-      ...(current.phase ? { phase: current.phase } : {}),
       status: "linked",
       linearId: current.linearId,
       lastAttemptAt: now,
@@ -92,7 +89,6 @@ export function stateForLookupResult(
       sessionId: current.sessionId,
       titleFingerprint: current.titleFingerprint,
       ...(current.candidateIdentifier ? { candidateIdentifier: current.candidateIdentifier } : {}),
-      ...(current.phase ? { phase: current.phase } : {}),
       status: "linked",
       linearId: result.issue.linearId,
       lastAttemptAt: now,
@@ -105,7 +101,6 @@ export function stateForLookupResult(
       sessionId: current.sessionId,
       titleFingerprint: current.titleFingerprint,
       ...(current.candidateIdentifier ? { candidateIdentifier: current.candidateIdentifier } : {}),
-      ...(current.phase ? { phase: current.phase } : {}),
       status: "not_found",
       lastAttemptAt: now,
       updatedAt: now,
@@ -115,7 +110,6 @@ export function stateForLookupResult(
     sessionId: current.sessionId,
     titleFingerprint: current.titleFingerprint,
     ...(current.candidateIdentifier ? { candidateIdentifier: current.candidateIdentifier } : {}),
-    ...(current.phase ? { phase: current.phase } : {}),
     status: "error",
     lastAttemptAt: now,
     failureCategory: result.category,

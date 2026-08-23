@@ -1,7 +1,7 @@
 # Frontend
 
-The frontend is the local web interface for exploring Codex usage attributed to Linear issues.
-It provides a desktop-only React dashboard for viewport widths of at least 1024 CSS pixels,
+The frontend is the local web interface for exploring global Codex usage and its Linear issue
+attribution. It provides a desktop-only React dashboard for viewport widths of at least 1024 CSS pixels,
 Tailwind CSS, shadcn/ui conventions, and RTK Query.
 Narrower viewport presentations are outside the supported product contract.
 
@@ -28,6 +28,7 @@ share this application-local mapping.
 
 ## Responsibilities
 
+- Display recent global usage totals and hourly token and estimated-cost charts
 - Display issue-level usage summaries and detailed session, model, and UTC-daily breakdowns
 - Show unlinked, invalid, or changed-candidate sessions and provide explicit relinking
 - Display token counts, developer turns, estimated cost, completeness, and sanitized warnings
@@ -47,9 +48,10 @@ The frontend does not read Codex files, call Linear directly, calculate pricing,
 
 ## Routes and state ownership
 
-The stable routes are `/issues`, `/issues/:issueId`, and `/sessions`; `/` redirects to the issue
-overview. Issue identity and one-based list pagination belong to React Router. Invalid pagination
-normalizes to the first page, and browser back or forward restores the URL-owned page.
+The stable routes are `/overview`, `/issues`, `/issues/:issueId`, and `/sessions`; `/` redirects to
+the recent-usage overview. The overview's non-default range and issue/session one-based list
+pagination belong to React Router. Invalid values normalize to canonical defaults, and browser
+back or forward restores URL-owned state.
 
 RTK Query owns issues, sessions, usage summaries, import state, Linear status, cost status, and
 their request lifecycles. The authored API enhancement adds focused cache tags while the generated
@@ -94,5 +96,5 @@ Feature-specific components remain within their feature until they are genuinely
 - Desktop-only browser verification: Playwright Chromium at the 1024 CSS-pixel support boundary
 
 The browser suite covers overview-to-detail navigation, explicit relinking, operational failure
-and retry, active polling termination, URL normalization, back navigation, large exact metrics,
-and page-level overflow at the minimum supported width.
+and retry, the absence of periodic operational status requests, URL normalization, back navigation,
+large exact metrics, and page-level overflow at the minimum supported width.

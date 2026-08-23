@@ -20,12 +20,19 @@ import { applyMigrations } from "@/database/migrate.js";
 import { CodexIngestionRepository } from "@/database/repositories/codex-ingestion-repository.js";
 import { discoverRoot } from "@/modules/sessions/discovery.js";
 import { CodexSourceImporter } from "@/modules/sessions/importer.js";
+import { CODEX_PARSER_VERSION } from "@/modules/sessions/parser.js";
 
 const fixture = fileURLToPath(new URL("../../fixtures/codex/valid-session.jsonl", import.meta.url));
+const itemCompletedFixture = fileURLToPath(
+  new URL("../../fixtures/codex/item-completed-user-turns.jsonl", import.meta.url),
+);
 const directories: string[] = [];
 const logger = pino({ enabled: false });
 
-async function setup(parserVersion = 3): Promise<{
+async function setup(
+  parserVersion = CODEX_PARSER_VERSION,
+  sourceFixture = fixture,
+): Promise<{
   database: AppDatabase;
   repository: CodexIngestionRepository;
   importer: CodexSourceImporter;
@@ -37,7 +44,7 @@ async function setup(parserVersion = 3): Promise<{
   const root = join(directory, "sessions");
   await mkdir(join(root, "2026", "01"), { recursive: true });
   const path = join(root, "2026", "01", "rollout-session.jsonl");
-  await copyFile(fixture, path);
+  await copyFile(sourceFixture, path);
   const database = await AppDatabase.open(join(directory, "test.duckdb"));
   await applyMigrations(database, logger);
   const repository = new CodexIngestionRepository(database);
@@ -139,7 +146,7 @@ describe("Codex source importer", () => {
     const importer = new CodexSourceImporter({ repository, readChunkBytes: 128, logger });
     await importer.importSource(opened.root, opened.path);
     expect(await repository.checkpoints.find(opened.path)).toMatchObject({
-      parserVersion: 3,
+      parserVersion: CODEX_PARSER_VERSION,
     });
     expect((await repository.checkpoints.find(opened.path))?.committedOffset).toBeGreaterThan(
       checkpoint?.committedOffset ?? 0n,
@@ -229,7 +236,7 @@ describe("Codex source importer", () => {
     });
     expect(await opened.repository.checkpoints.find(opened.path)).toMatchObject({
       status: "ready",
-      parserVersion: 3,
+      parserVersion: CODEX_PARSER_VERSION,
     });
     opened.database.close();
   });
@@ -273,6 +280,77 @@ describe("Codex source importer", () => {
       totalTokens: 8n,
       usageObserved: true,
     });
+    opened.database.close();
+  });
+
+  test("rebuilds version-3 sources with current user items and stays idempotent", async () => {
+    const opened = await setup(3, itemCompletedFixture);
+    await opened.importer.importSource(opened.root, opened.path);
+    expect(await opened.repository.sessions.findById("item-completed-user-turns")).toMatchObject({
+      developerTurns: 1n,
+    });
+    expect(
+      await opened.repository.events.listBySessionId("item-completed-user-turns"),
+    ).toHaveLength(1);
+    expect(await opened.repository.checkpoints.find(opened.path)).toMatchObject({
+      parserVersion: 3,
+    });
+
+    const upgraded = new CodexSourceImporter({
+      repository: opened.repository,
+      readChunkBytes: 128,
+      logger,
+      parserVersion: CODEX_PARSER_VERSION,
+    });
+    const rebuilt = await upgraded.importSource(opened.root, opened.path);
+    expect(rebuilt).toMatchObject({
+      state: "imported",
+      rebuilt: true,
+      sessions: ["item-completed-user-turns"],
+    });
+    expect(await opened.repository.sessions.findById("item-completed-user-turns")).toMatchObject({
+      developerTurns: 2n,
+    });
+    expect(await opened.repository.checkpoints.find(opened.path)).toMatchObject({
+      parserVersion: CODEX_PARSER_VERSION,
+      status: "ready",
+    });
+    const rebuiltEvents = await opened.repository.events.listBySessionId(
+      "item-completed-user-turns",
+    );
+    expect(rebuiltEvents).toHaveLength(2);
+    expect(rebuiltEvents.map((event) => event.sourceRecordNumber)).toEqual([2n, 3n]);
+    expect(rebuiltEvents.map((event) => event.messageContent)).toEqual([
+      "SYNTHETIC_LEGACY_USER",
+      "SYNTHETIC_CURRENT_USER",
+    ]);
+
+    await appendFile(
+      opened.path,
+      `${JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "item_completed",
+          item: {
+            id: "synthetic-appended-user-item",
+            type: "UserMessage",
+            content: [{ type: "text", text: "SYNTHETIC_APPENDED_CURRENT_USER" }],
+          },
+        },
+      })}\n`,
+    );
+    const appended = await upgraded.importSource(opened.root, opened.path);
+    expect(appended).toMatchObject({ state: "imported", rebuilt: false });
+    expect(await opened.repository.sessions.findById("item-completed-user-turns")).toMatchObject({
+      developerTurns: 3n,
+    });
+    expect(
+      await opened.repository.events.listBySessionId("item-completed-user-turns"),
+    ).toHaveLength(3);
+    expect((await upgraded.importSource(opened.root, opened.path)).state).toBe("unchanged");
+    expect(
+      (await opened.repository.sessions.findById("item-completed-user-turns"))?.developerTurns,
+    ).toBe(3n);
     opened.database.close();
   });
 

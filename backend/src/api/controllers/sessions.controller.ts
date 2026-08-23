@@ -4,6 +4,7 @@ import {
   Get,
   Path,
   Post,
+  Put,
   Query,
   Response,
   Route,
@@ -22,6 +23,10 @@ import type {
   SessionPageResponse,
   SessionResponse,
 } from "@/api/models/session-response.js";
+import type {
+  SessionPhaseRequest,
+  SessionPhaseResponse,
+} from "@/api/models/session-phase-response.js";
 
 @Route("api/sessions")
 @Tags("Sessions")
@@ -57,6 +62,20 @@ export class SessionsController extends Controller {
     await apiDependencies().linear.relink(sessionId, request.issueIdentifier);
     const session = await apiDependencies().sessions.find(sessionId);
     if (!session) throw new SessionNotFoundError();
+    return { attribution: session.attribution };
+  }
+
+  @Put("{sessionId}/phase")
+  @SuccessResponse(200, "Session phase updated")
+  @Response<ErrorResponse>(404, "Session not found")
+  @Response<ErrorResponse>(422, "Invalid session phase")
+  public async setPhase(
+    @Path() sessionId: string,
+    @Body() request: SessionPhaseRequest,
+  ): Promise<SessionPhaseResponse> {
+    const phaseService = apiDependencies().phase;
+    if (!phaseService) throw new Error("Session phase service has not been configured");
+    const session = await phaseService.set(sessionId, request.phase);
     return { attribution: session.attribution };
   }
 }
