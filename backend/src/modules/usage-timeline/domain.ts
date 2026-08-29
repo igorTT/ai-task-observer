@@ -1,9 +1,11 @@
 import type { CostCalculationGeneration } from "@/database/models/cost-calculation-generation.model.js";
+import { SESSION_PHASES, type SessionPhase } from "@/modules/sessions/domain.js";
 
 export type UsageTimelineRange = "12h" | "24h";
 export type UsageTimelineBucketUnit = "hour";
 export type UsageTimelineCoverage = "current" | "stale" | "missing";
 export type UsageTimelineCompleteness = "complete" | "partial" | "unavailable";
+export type UsageTimelineSessionPhase = SessionPhase | "unassigned";
 
 export interface UsageTimelineRangeDefinition {
   readonly range: UsageTimelineRange;
@@ -56,6 +58,16 @@ export function usageTimelineRange(value: string | undefined): UsageTimelineRang
   throw new UsageTimelineRangeError();
 }
 
+export function usageTimelineSessionPhase(
+  value: string | undefined,
+): UsageTimelineSessionPhase | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (value === "unassigned" || SESSION_PHASES.some((phase) => phase === value)) {
+    return value as UsageTimelineSessionPhase;
+  }
+  throw new UsageTimelineSessionPhaseError();
+}
+
 export function usageTimelineWindow(range: UsageTimelineRange, endAt: Date): UsageTimelineWindow {
   const definition = USAGE_TIMELINE_RANGES[range];
   return {
@@ -73,5 +85,17 @@ export class UsageTimelineRangeError extends Error {
   public constructor() {
     super("range must be one of 12h or 24h");
     this.name = "UsageTimelineRangeError";
+  }
+}
+
+export class UsageTimelineSessionPhaseError extends Error {
+  public readonly status = 422;
+  public readonly code = "validation_error";
+
+  public constructor() {
+    super(
+      "sessionPhase must be one of research, explore, proposal, apply, verify, quick-flow, other, or unassigned",
+    );
+    this.name = "UsageTimelineSessionPhaseError";
   }
 }

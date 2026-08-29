@@ -25,7 +25,13 @@ beforeEach(() => {
           { error: { code: "internal_error", message: "private" } },
           { status: 500 },
         );
-      return Response.json(timeline(url.includes("range=24h") ? "24h" : "12h"));
+      const parameters = new URL(url).searchParams;
+      return Response.json(
+        timeline(
+          parameters.get("range") === "24h" ? "24h" : "12h",
+          parameters.get("sessionPhase") ?? "all",
+        ),
+      );
     }
     if (url.includes("/api/imports/status"))
       return Response.json({ roots: [], checkpoints: [], acceptingWork: true });
@@ -68,6 +74,9 @@ describe("recent usage overview", () => {
     expect(screen.getByText("$0.12")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Token consumption" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Estimated cost" })).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", { name: "Current session phase" }).value,
+    ).toBe("all");
     expect(timelineRequests).toHaveLength(1);
     expect(timelineRequests[0]).toContain("range=12h");
 
@@ -81,6 +90,58 @@ describe("recent usage overview", () => {
     expect(timelineRequests.some((url) => url.includes("range=24h"))).toBe(true);
   });
 
+  test("filters all overview values by Proposal and explains current assignment semantics", async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ["/overview"] });
+    render(<App router={router} store={createAppStore()} />);
+
+    await screen.findByText("13k");
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Current session phase" }),
+      "proposal",
+    );
+
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=proposal"));
+    expect(await screen.findByText("39k")).toBeTruthy();
+    expect(screen.getByText("$0.36")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Showing usage from sessions currently assigned to Proposal. This is the current session classification, not phase-at-event history.",
+      ),
+    ).toBeTruthy();
+    expect(timelineRequests.some((url) => url.includes("sessionPhase=proposal"))).toBe(true);
+  });
+
+  test("supports Unassigned separately from explicit other and restores phase through history", async () => {
+    const router = createMemoryRouter(routes, { initialEntries: ["/overview"] });
+    render(<App router={router} store={createAppStore()} />);
+
+    await screen.findByText("13k");
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Current session phase" }),
+      "unassigned",
+    );
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=unassigned"));
+    expect(await screen.findByText("52k")).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", { name: "Current session phase" }).value,
+    ).toBe("unassigned");
+
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Current session phase" }),
+      "other",
+    );
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=other"));
+    expect(timelineRequests.some((url) => url.includes("sessionPhase=other"))).toBe(true);
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(router.state.location.search).toBe("?phase=unassigned"));
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", { name: "Current session phase" }).value,
+    ).toBe("unassigned");
+  });
+
   test("keeps the range selector available and shows a sanitized retry after failure", async () => {
     failTimeline = true;
     const router = createMemoryRouter(routes, { initialEntries: ["/overview?range=24h"] });
@@ -90,6 +151,7 @@ describe("recent usage overview", () => {
       await screen.findByRole("heading", { name: "Unable to load recent usage" }),
     ).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Recent usage range" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Current session phase" })).toBeTruthy();
     expect(screen.queryByText("private")).toBeNull();
     failTimeline = false;
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -156,15 +218,32 @@ describe("recent usage overview", () => {
       screen.getByRole<HTMLSelectElement>("combobox", { name: "Recent usage range" }).value,
     ).toBe("12h");
   });
+
+  test("normalizes invalid phase URLs without issuing an unsupported request", async () => {
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/overview?range=24h&page=2&phase=invalid"],
+    });
+    render(<App router={router} store={createAppStore()} />);
+
+    await screen.findByText("26k");
+    await waitFor(() => expect(router.state.location.search).toBe("?range=24h&page=2"));
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", { name: "Current session phase" }).value,
+    ).toBe("all");
+    expect(timelineRequests.every((url) => !url.includes("sessionPhase=invalid"))).toBe(true);
+  });
 });
 
-function timeline(range: "12h" | "24h") {
-  const multiplier = range === "12h" ? 1 : 2;
+function timeline(range: "12h" | "24h", phase: string) {
+  const rangeMultiplier = range === "12h" ? 1 : 2;
+  const phaseMultiplier = phase === "proposal" ? 3 : phase === "unassigned" ? 4 : 1;
+  const multiplier = rangeMultiplier * phaseMultiplier;
   return {
     range,
     bucketUnit: "hour",
     startAt: "2026-08-22T00:00:00.000Z",
     endAt: "2026-08-22T12:00:00.000Z",
+    sessionPhase: phase === "all" ? null : phase,
     totals: {
       totalTokens: String(13_000 * multiplier),
       estimatedCostUsd: `0.${12 * multiplier}`,

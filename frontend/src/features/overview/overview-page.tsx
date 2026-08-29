@@ -32,18 +32,31 @@ import {
   type UsageTimelinePresentationBucket,
 } from "@/features/overview/usage-timeline-presentation";
 import { UsageRangeSelector } from "@/features/overview/range-selector";
+import { UsagePhaseSelector } from "@/features/overview/phase-selector";
+import {
+  useUsagePhase,
+  usagePhaseLabel,
+  usagePhaseQueryValue,
+  type UsagePhase,
+} from "@/lib/usage-phase";
 
 export function OverviewPage() {
   const [range, setRange] = useUsageRange();
-  const query = useUsageTimelineQuery({ range });
+  const [phase, setPhase] = useUsagePhase();
+  const sessionPhase = usagePhaseQueryValue(phase);
+  const query = useUsageTimelineQuery({
+    range,
+    ...(sessionPhase ? { sessionPhase } : {}),
+  });
   const imports = useImportStatusQuery();
   const costs = useCostCalculationStatusQuery();
 
   return (
     <section className="space-y-6">
       <PageHeading title="Recent usage" refreshing={query.isFetching && Boolean(query.data)} />
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-3">
         <UsageRangeSelector value={range} onChange={setRange} />
+        <UsagePhaseSelector value={phase} onChange={setPhase} />
       </div>
       {query.isLoading && !query.data ? (
         <OverviewLoading />
@@ -53,6 +66,7 @@ export function OverviewPage() {
         <OverviewContent
           timeline={query.data}
           range={range}
+          phase={phase}
           refreshError={query.isError ? query.error : undefined}
           retry={() => void query.refetch()}
           importsActive={isActiveWork(imports.data?.currentRun?.state)}
@@ -66,6 +80,7 @@ export function OverviewPage() {
 function OverviewContent({
   timeline,
   range,
+  phase,
   refreshError,
   retry,
   importsActive,
@@ -73,6 +88,7 @@ function OverviewContent({
 }: {
   timeline: UsageTimelineResponse;
   range: UsageRange;
+  phase: UsagePhase;
   refreshError?: unknown;
   retry: () => void;
   importsActive: boolean;
@@ -101,6 +117,12 @@ function OverviewContent({
               : "Estimated cost coverage is stale. Token usage remains independently available."}
           {generation && <span className="ml-2">Generation {generation.generationId}.</span>}
         </Alert>
+      )}
+      {phase !== "all" && (
+        <p className="text-sm text-slate-600" aria-live="polite">
+          Showing usage from sessions currently assigned to {usagePhaseLabel(phase)}. This is the
+          current session classification, not phase-at-event history.
+        </p>
       )}
       {timeline.unknownTimeObservationCount !== "0" && (
         <Alert>

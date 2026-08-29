@@ -21,6 +21,31 @@
 				],
 				"nullable": false
 			},
+			"SessionPhase": {
+				"type": "string",
+				"enum": [
+					"research",
+					"explore",
+					"proposal",
+					"apply",
+					"verify",
+					"quick-flow",
+					"other"
+				]
+			},
+			"UsageTimelineSessionPhaseResponse": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/SessionPhase"
+					},
+					{
+						"type": "string",
+						"enum": [
+							"unassigned"
+						]
+					}
+				]
+			},
 			"UsageTimelineCompletenessState": {
 				"type": "string",
 				"enum": [
@@ -181,6 +206,14 @@
 					"endAt": {
 						"type": "string"
 					},
+					"sessionPhase": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/UsageTimelineSessionPhaseResponse"
+							}
+						],
+						"nullable": true
+					},
 					"totals": {
 						"$ref": "#/components/schemas/UsageTimelineTotalsResponse"
 					},
@@ -210,6 +243,7 @@
 					"bucketUnit",
 					"startAt",
 					"endAt",
+					"sessionPhase",
 					"totals",
 					"buckets",
 					"unknownTimeObservationCount",
@@ -296,18 +330,6 @@
 					"linked",
 					"not_found",
 					"error"
-				]
-			},
-			"SessionPhase": {
-				"type": "string",
-				"enum": [
-					"research",
-					"explore",
-					"proposal",
-					"apply",
-					"verify",
-					"quick-flow",
-					"other"
 				]
 			},
 			"LinearIssueResponse": {
@@ -1445,7 +1467,7 @@
 						}
 					},
 					"422": {
-						"description": "Unsupported usage range",
+						"description": "Unsupported usage range or session phase",
 						"content": {
 							"application/json": {
 								"schema": {
@@ -1455,7 +1477,7 @@
 						}
 					}
 				},
-				"description": "Returns global committed usage in a supported rolling range.",
+				"description": "Returns committed usage in a supported rolling range and optional current session phase.",
 				"tags": [
 					"Usage timeline"
 				],
@@ -1467,6 +1489,14 @@
 						"required": false,
 						"schema": {
 							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "sessionPhase",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/UsageTimelineSessionPhaseResponse"
 						}
 					}
 				]

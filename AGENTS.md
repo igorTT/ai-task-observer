@@ -55,6 +55,7 @@ persist or expose reasoning, tool arguments/results, credentials, opaque raw rec
 payloads, or message transcripts through APIs or diagnostics.
 
 <!-- CARTODEX:START -->
+
 ## Cartodex Map
 
 This repository can be navigated with the generated Cartodex map at [docs/CARTODEX_MAP.md](docs/CARTODEX_MAP.md).

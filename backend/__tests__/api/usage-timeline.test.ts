@@ -42,6 +42,7 @@ describe("usage timeline API", () => {
       const defaultBody = defaultResponse.body as UsageTimelineResponse;
       expect(defaultResponse.status).toBe(200);
       expect(defaultBody.range).toBe("12h");
+      expect(defaultBody.sessionPhase).toBeNull();
       expect(defaultBody.totals.totalTokens).toBe("63");
       expect(defaultBody.buckets.length).toBeGreaterThan(1);
 
@@ -49,6 +50,7 @@ describe("usage timeline API", () => {
       const explicitBody = explicitResponse.body as UsageTimelineResponse;
       expect(explicitResponse.status).toBe(200);
       expect(explicitBody.range).toBe("24h");
+      expect(explicitBody.sessionPhase).toBeNull();
       expect(explicitBody.totals.totalTokens).toBe("64");
       expect(JSON.stringify(explicitBody)).not.toContain("/root/");
       expect(JSON.stringify(explicitBody)).not.toContain("selected");
@@ -63,6 +65,45 @@ describe("usage timeline API", () => {
       expect(response.body).toEqual({
         error: { code: "validation_error", message: "range must be one of 12h or 24h" },
       });
+    });
+  });
+
+  test("filters and echoes canonical and unassigned session phases", async () => {
+    fixture = await createIssueUsageFixture();
+    const app = appFor(fixture);
+    await withApp(app, async (server) => {
+      const canonical = await request(server).get(
+        "/api/usage/timeline?range=12h&sessionPhase=explore",
+      );
+      expect(canonical.status).toBe(200);
+      expect(canonical.body).toMatchObject({
+        range: "12h",
+        sessionPhase: "explore",
+        unknownTimeObservationCount: "1",
+        totals: { totalTokens: "55" },
+      });
+
+      const unassigned = await request(server).get(
+        "/api/usage/timeline?range=12h&sessionPhase=unassigned",
+      );
+      expect(unassigned.status).toBe(200);
+      expect(unassigned.body).toMatchObject({
+        sessionPhase: "unassigned",
+        unknownTimeObservationCount: "0",
+        totals: { totalTokens: "8" },
+      });
+    });
+  });
+
+  test("rejects unsupported session phases without exposing internals", async () => {
+    fixture = await createIssueUsageFixture();
+    await withApp(appFor(fixture), async (server) => {
+      const response = await request(server).get("/api/usage/timeline?sessionPhase=not-a-phase");
+      expect(response.status).toBe(422);
+      expect(response.body).toMatchObject({
+        error: { code: "validation_error", message: "Request validation failed" },
+      });
+      expect(JSON.stringify(response.body)).not.toContain("/root/");
     });
   });
 });

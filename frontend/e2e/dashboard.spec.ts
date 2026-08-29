@@ -36,6 +36,7 @@ async function installApi(page: Page) {
         bucketUnit: "hour",
         startAt: "2026-08-22T00:00:00.000Z",
         endAt: "2026-08-22T12:00:00.000Z",
+        sessionPhase: null,
         totals: {
           totalTokens: String(13000 * multiplier),
           estimatedCostUsd: `0.${12 * multiplier}`,

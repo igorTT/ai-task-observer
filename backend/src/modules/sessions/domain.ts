@@ -4,6 +4,16 @@ export type ImportTrigger = "startup" | "watch" | "rescan" | "rediscovery";
 export type SessionPhase =
   "research" | "explore" | "proposal" | "apply" | "verify" | "quick-flow" | "other";
 
+export const SESSION_PHASES = [
+  "research",
+  "explore",
+  "proposal",
+  "apply",
+  "verify",
+  "quick-flow",
+  "other",
+] as const satisfies readonly SessionPhase[];
+
 export interface TokenValues {
   readonly input: bigint;
   readonly cachedInput: bigint;

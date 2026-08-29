@@ -11,6 +11,7 @@ import {
   type UsageTimelineBucketRecord,
   type UsageTimelineRange,
   type UsageTimelineMetricRecord,
+  type UsageTimelineSessionPhase,
 } from "@/modules/usage-timeline/domain.js";
 import type { UsageTimelineRepository } from "@/database/repositories/usage-timeline-repository.js";
 
@@ -38,19 +39,24 @@ export class UsageTimelineQueryService {
     this.#now = options.now ?? (() => new Date());
   }
 
-  public async get(range: UsageTimelineRange = "12h"): Promise<UsageTimelineResponse> {
+  public async get(
+    range: UsageTimelineRange = "12h",
+    sessionPhase?: UsageTimelineSessionPhase,
+  ): Promise<UsageTimelineResponse> {
     const endAt = this.#now();
     const [costStatus] = await Promise.all([this.#costs.status()]);
     const window = usageTimelineWindow(range, endAt);
     const aggregate = await this.#repository.query(
       window,
       costStatus.latestCompleted?.generationId,
+      sessionPhase,
     );
     return {
       range: window.range,
       bucketUnit: window.bucketUnit,
       startAt: window.startAt.toISOString(),
       endAt: window.endAt.toISOString(),
+      sessionPhase: sessionPhase ?? null,
       totals: metricsResponse(aggregate.totals),
       buckets: aggregate.buckets.map(bucketResponse),
       unknownTimeObservationCount: aggregate.unknownTimeObservationCount.toString(10),

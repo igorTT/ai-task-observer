@@ -4,6 +4,7 @@ export const dashboardApi = generatedApi.enhanceEndpoints({
   endpoints: {
     list: { providesTags: ["Sessions"] },
     detail: { providesTags: ["Sessions"] },
+    setPhase: { invalidatesTags: ["Sessions", "IssueUsage", "UsageTimeline"] },
     relink: { invalidatesTags: ["Sessions", "IssueUsage", "LinearStatus"] },
     status: { providesTags: ["LinearStatus"] },
     sync: { invalidatesTags: ["LinearStatus", "Sessions"] },

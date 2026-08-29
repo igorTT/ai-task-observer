@@ -10,6 +10,7 @@ import type {
   UsageTimelineAggregateRecord,
   UsageTimelineBucketRecord,
   UsageTimelineMetricRecord,
+  UsageTimelineSessionPhase,
   UsageTimelineWindow,
 } from "@/modules/usage-timeline/domain.js";
 
@@ -49,10 +50,11 @@ export class UsageTimelineRepository {
   public async query(
     window: UsageTimelineWindow,
     generationId?: string,
+    sessionPhase?: UsageTimelineSessionPhase,
   ): Promise<UsageTimelineAggregateRecord> {
     const [facts, unknownTimeObservationCount] = await Promise.all([
-      this.listFacts(window, generationId),
-      this.countUnknownTimeObservations(),
+      this.listFacts(window, generationId, sessionPhase),
+      this.countUnknownTimeObservations(sessionPhase),
     ]);
     const buckets = buildBuckets(window, facts);
     return {
@@ -65,6 +67,7 @@ export class UsageTimelineRepository {
   async listFacts(
     window: UsageTimelineWindow,
     generationId?: string,
+    sessionPhase?: UsageTimelineSessionPhase,
   ): Promise<UsageTimelineFact[]> {
     const statement = await this.connection.prepare(`
       SELECT
@@ -81,16 +84,24 @@ export class UsageTimelineRepository {
         ci.gap_codes AS pricing_gap_codes,
         ci.observation_id IS NOT NULL AS generation_covered
       FROM codex_usage_observations o
+      LEFT JOIN session_phase_assignments spa
+        ON spa.session_id = o.session_id
       LEFT JOIN cost_calculation_items ci
         ON ci.generation_id = $generationId
         AND ci.observation_id = o.observation_id
       WHERE o.event_time IS NOT NULL
         AND o.event_time >= CAST($startAt AS TIMESTAMPTZ)
         AND o.event_time < CAST($endAt AS TIMESTAMPTZ)
+        AND (
+          $sessionPhase IS NULL
+          OR ($sessionPhase = 'unassigned' AND spa.session_id IS NULL)
+          OR ($sessionPhase <> 'unassigned' AND spa.phase = $sessionPhase)
+        )
       ORDER BY o.event_time ASC, o.observation_id ASC
     `);
     statement.bind({
       generationId: generationId ?? null,
+      sessionPhase: sessionPhase ?? null,
       startAt: window.startAt.toISOString(),
       endAt: window.endAt.toISOString(),
     });
@@ -98,12 +109,23 @@ export class UsageTimelineRepository {
     return (reader.getRowObjects() as unknown as UsageTimelineFactRow[]).map(mapFact);
   }
 
-  private async countUnknownTimeObservations(): Promise<bigint> {
-    const reader = await this.connection.runAndReadAll(`
+  private async countUnknownTimeObservations(
+    sessionPhase?: UsageTimelineSessionPhase,
+  ): Promise<bigint> {
+    const statement = await this.connection.prepare(`
       SELECT count(*)::BIGINT AS count
-      FROM codex_usage_observations
-      WHERE event_time IS NULL
+      FROM codex_usage_observations o
+      LEFT JOIN session_phase_assignments spa
+        ON spa.session_id = o.session_id
+      WHERE o.event_time IS NULL
+        AND (
+          $sessionPhase IS NULL
+          OR ($sessionPhase = 'unassigned' AND spa.session_id IS NULL)
+          OR ($sessionPhase <> 'unassigned' AND spa.phase = $sessionPhase)
+        )
     `);
+    statement.bind({ sessionPhase: sessionPhase ?? null });
+    const reader = await statement.runAndReadAll();
     return BigInt((reader.getRowObjects() as Array<{ count: bigint }>)[0]?.count ?? 0n);
   }
 }

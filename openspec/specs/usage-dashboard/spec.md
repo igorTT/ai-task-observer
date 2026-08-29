@@ -250,7 +250,10 @@ both the current issue and candidate.
 The application shell SHALL surface import, Linear synchronization, and cost-calculation state and
 SHALL provide the existing manual rescan, synchronization, and recalculation actions. Actions SHALL
 reflect unconfigured, active, queued, stale, failed, and unavailable states without inventing a
-successful outcome.
+successful outcome. The shell SHALL provide one explicit status-refresh action and SHALL NOT
+periodically request operational status solely to discover asynchronous changes. The import summary
+SHALL show checkpoint totals while limiting per-checkpoint details to checkpoints with a non-ready
+state, unknown records, malformed records, or a sanitized error.
 
 #### Scenario: All subsystems are current
 
@@ -262,15 +265,40 @@ successful outcome.
 - **WHEN** an import root is unavailable, a run has errors, Linear is unconfigured or failed, or cost coverage is stale or missing
 - **THEN** the shell SHALL identify the affected subsystem and expose only sanitized details returned by the API
 
+#### Scenario: User refreshes operational status
+
+- **WHEN** the user invokes the status-refresh action
+- **THEN** the dashboard SHALL request fresh import, Linear, and cost-calculation status, retain previously displayed data while refreshing, and indicate that refresh work is pending
+
+#### Scenario: Operational status remains idle
+
+- **WHEN** initial or explicitly refreshed status reports no queued or active operational work
+- **THEN** the dashboard SHALL NOT issue periodic operational-status requests
+
 #### Scenario: User starts an operation
 
 - **WHEN** a user invokes rescan, synchronization, or cost recalculation
-- **THEN** the dashboard SHALL prevent accidental duplicate submission while pending, show the accepted queued or running state, and refresh relevant status and usage data
+- **THEN** the dashboard SHALL prevent accidental duplicate submission while pending, show the accepted queued or running state, and refresh relevant status and usage data without starting periodic status polling
+
+#### Scenario: Import checkpoints are healthy
+
+- **WHEN** imported checkpoint status contains ready checkpoints with no unknown records, malformed records, or sanitized error
+- **THEN** the import summary SHALL include those checkpoints in its total and SHALL NOT list their individual source details
+
+#### Scenario: Import checkpoint needs attention
+
+- **WHEN** a checkpoint has a non-ready state, unknown records, malformed records, or a sanitized error
+- **THEN** the import summary SHALL identify that checkpoint and expose its available sanitized diagnostic counts and state
 
 #### Scenario: Operation request fails
 
 - **WHEN** an operational mutation fails
 - **THEN** the dashboard SHALL retain the prior displayed data, report the failure, and provide retry where the backend state permits
+
+#### Scenario: Status refresh fails
+
+- **WHEN** one or more operational status requests fail during an explicit refresh
+- **THEN** the dashboard SHALL retain available prior status data and identify each affected subsystem through its existing sanitized error presentation
 
 ### Requirement: Honest metric formatting
 
@@ -425,3 +453,66 @@ keys as UTC dates and SHALL distinguish unavailable or invalid timestamp values 
 
 - **WHEN** issue detail displays a daily-usage bucket identified by a UTC calendar date
 - **THEN** the dashboard SHALL preserve the returned date and identify the breakdown as UTC rather than converting the bucket to the client time zone
+
+### Requirement: Exact bucket data presentation
+
+The overview SHALL provide an Exact bucket data table for the selected recent-usage range. The
+table SHALL present each returned interval, exact token value, and exact estimated-cost value in
+reverse chronological order. It SHALL NOT present a dedicated Completeness field, and SHALL
+identify incomplete or unavailable state alongside each affected metric value.
+
+#### Scenario: Exact bucket rows are displayed
+
+- **WHEN** the selected timeline contains multiple hourly buckets
+- **THEN** the Exact bucket data table SHALL display the bucket with the latest interval first and
+  continue in descending interval order
+
+#### Scenario: Exact bucket columns are displayed
+
+- **WHEN** the Exact bucket data table is rendered
+- **THEN** it SHALL expose Interval, Tokens, and Estimated cost fields and SHALL NOT expose a
+  Completeness field
+
+#### Scenario: A bucket metric is not complete
+
+- **WHEN** a bucket has an incomplete or unavailable token or estimated-cost value
+- **THEN** the table SHALL identify that state alongside the affected value without using a
+  dedicated Completeness field
+
+### Requirement: Usage metric badges explain warning states
+
+Usage metric state SHALL display badges only for incomplete token accounting, incomplete or
+unavailable cost, anomaly codes, and pricing-gap codes. Each displayed warning badge SHALL provide
+a concise sanitized explanation that is available to pointer and keyboard users without hiding
+known metric values.
+
+#### Scenario: Usage metrics are complete
+
+- **WHEN** token and cost accounting are complete and no anomaly or pricing-gap codes are present
+- **THEN** the dashboard SHALL display the metric values without token-complete or cost-complete
+  success badges
+
+#### Scenario: Usage metrics contain warnings
+
+- **WHEN** token or cost accounting is incomplete or the response contains anomaly or pricing-gap
+  codes
+- **THEN** the dashboard SHALL display a warning badge for every applicable warning state while
+  preserving all known metric values
+
+#### Scenario: User requests a warning explanation
+
+- **WHEN** a user hovers over or moves keyboard focus to a usage warning badge
+- **THEN** the dashboard SHALL expose a concise explanation of what the warning means
+
+#### Scenario: Warning code is not recognized by the client
+
+- **WHEN** the backend returns a sanitized anomaly or pricing-gap code for which the client has no
+  specific explanation
+- **THEN** the dashboard SHALL retain a human-readable warning label and provide a generic
+  sanitized explanation without exposing raw payloads
+
+#### Scenario: Several warnings are present
+
+- **WHEN** a metric summary contains more than one warning condition or code
+- **THEN** each warning badge SHALL remain independently focusable and SHALL expose the explanation
+  associated with that badge

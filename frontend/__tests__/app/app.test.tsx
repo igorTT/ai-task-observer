@@ -17,6 +17,7 @@ describe("application shell", () => {
           bucketUnit: "hour",
           startAt: "2026-08-22T00:00:00.000Z",
           endAt: "2026-08-22T12:00:00.000Z",
+          sessionPhase: null,
           totals: {
             totalTokens: "0",
             estimatedCostUsd: "0",

@@ -34,6 +34,16 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"enum","enums":["hour"],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SessionPhase": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["research"]},{"dataType":"enum","enums":["explore"]},{"dataType":"enum","enums":["proposal"]},{"dataType":"enum","enums":["apply"]},{"dataType":"enum","enums":["verify"]},{"dataType":"enum","enums":["quick-flow"]},{"dataType":"enum","enums":["other"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "UsageTimelineSessionPhaseResponse": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"ref":"SessionPhase"},{"dataType":"enum","enums":["unassigned"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "UsageTimelineCompletenessState": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["complete"]},{"dataType":"enum","enums":["partial"]},{"dataType":"enum","enums":["unavailable"]}],"validators":{}},
@@ -101,6 +111,7 @@ const models: TsoaRoute.Models = {
             "bucketUnit": {"ref":"UsageTimelineBucketUnitResponse","required":true},
             "startAt": {"dataType":"string","required":true},
             "endAt": {"dataType":"string","required":true},
+            "sessionPhase": {"dataType":"union","subSchemas":[{"ref":"UsageTimelineSessionPhaseResponse"},{"dataType":"enum","enums":[null]}],"required":true},
             "totals": {"ref":"UsageTimelineTotalsResponse","required":true},
             "buckets": {"dataType":"array","array":{"dataType":"refObject","ref":"UsageTimelineBucketResponse"},"required":true},
             "unknownTimeObservationCount": {"dataType":"string","required":true},
@@ -141,11 +152,6 @@ const models: TsoaRoute.Models = {
     "AttributionStatus": {
         "dataType": "refAlias",
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["unlinked"]},{"dataType":"enum","enums":["unconfigured"]},{"dataType":"enum","enums":["pending"]},{"dataType":"enum","enums":["linked"]},{"dataType":"enum","enums":["not_found"]},{"dataType":"enum","enums":["error"]}],"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "SessionPhase": {
-        "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["research"]},{"dataType":"enum","enums":["explore"]},{"dataType":"enum","enums":["proposal"]},{"dataType":"enum","enums":["apply"]},{"dataType":"enum","enums":["verify"]},{"dataType":"enum","enums":["quick-flow"]},{"dataType":"enum","enums":["other"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "LinearIssueResponse": {
@@ -552,6 +558,7 @@ export function RegisterRoutes(app: Router) {
     
         const argsUsageTimelineController_timeline: Record<string, TsoaRoute.ParameterSchema> = {
                 range: {"in":"query","name":"range","dataType":"string"},
+                sessionPhase: {"in":"query","name":"sessionPhase","ref":"UsageTimelineSessionPhaseResponse"},
         };
         app.get('/api/usage/timeline',
             ...(fetchMiddlewares<RequestHandler>(UsageTimelineController)),

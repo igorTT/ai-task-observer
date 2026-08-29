@@ -12,6 +12,7 @@ const timeline: UsageTimelineResponse = {
   bucketUnit: "hour",
   startAt: "2026-08-22T10:15:00.000Z",
   endAt: "2026-08-22T12:15:00.000Z",
+  sessionPhase: null,
   totals: {
     totalTokens: "9007199254740993",
     estimatedCostUsd: "0.000000000000000001",

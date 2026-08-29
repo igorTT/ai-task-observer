@@ -28,6 +28,7 @@ describe("UsageTimelineQueryService", () => {
     expect(result).toMatchObject({
       range: "12h",
       bucketUnit: "hour",
+      sessionPhase: null,
       startAt: "2026-08-01T02:00:00.000Z",
       endAt: "2026-08-01T14:00:00.000Z",
       unknownTimeObservationCount: "1",
@@ -78,6 +79,29 @@ describe("UsageTimelineQueryService", () => {
     expect(result.costCoverage).toBe("missing");
     expect(serialized).not.toContain("/root/");
     expect(serialized).not.toContain("selected");
+  });
+
+  test("echoes and applies the current session phase selection", async () => {
+    fixture = await createIssueUsageFixture();
+    const service = new UsageTimelineQueryService({
+      repository: new UsageTimelineRepository(fixture.database.connection),
+      costs: costStatus("generation-current", "current"),
+      now: () => new Date("2026-08-01T14:00:00.000Z"),
+    });
+
+    const apply = await service.get("12h", "apply");
+    expect(apply).toMatchObject({
+      sessionPhase: "apply",
+      unknownTimeObservationCount: "0",
+      totals: { totalTokens: "22", tokenComplete: true },
+    });
+
+    const unassigned = await service.get("12h", "unassigned");
+    expect(unassigned).toMatchObject({
+      sessionPhase: "unassigned",
+      unknownTimeObservationCount: "0",
+      totals: { totalTokens: "1098", tokenComplete: true },
+    });
   });
 });
 

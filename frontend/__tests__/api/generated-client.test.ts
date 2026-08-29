@@ -4,7 +4,9 @@ import {
   generatedApi,
   type GetHealthApiResponse,
   type GetIssueUsageApiResponse,
+  type TimelineApiArg,
   type TimelineApiResponse,
+  type UsageTimelineSessionPhaseResponse,
 } from "@/api/generated/api";
 import { createAppStore } from "@/app/store";
 
@@ -93,6 +95,7 @@ describe("generated usage timeline client", () => {
         bucketUnit: "hour",
         startAt: "2026-08-21T12:15:00.000Z",
         endAt: "2026-08-22T12:15:00.000Z",
+        sessionPhase: null,
         totals: {
           totalTokens: "9007199254740993",
           estimatedCostUsd: "0.000000000000000001",
@@ -121,6 +124,61 @@ describe("generated usage timeline client", () => {
       expect(result.totals.totalTokens).toBe("9007199254740993");
       expect(result.totals.estimatedCostUsd).toBe("0.000000000000000001");
       expect(result.totals.completeness.cost).toBe("partial");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("serializes the typed current session phase selection", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedUrl = "";
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      requestedUrl = input instanceof Request ? input.url : String(input);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            range: "12h",
+            bucketUnit: "hour",
+            startAt: "2026-08-22T00:00:00.000Z",
+            endAt: "2026-08-22T12:00:00.000Z",
+            sessionPhase: "unassigned",
+            totals: {
+              totalTokens: "0",
+              estimatedCostUsd: "0",
+              tokenComplete: true,
+              costComplete: true,
+              completeness: { token: "complete", cost: "complete" },
+              warnings: [],
+            },
+            buckets: [],
+            unknownTimeObservationCount: "0",
+            costCoverage: "current",
+            latestCompletedCostGeneration: null,
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+    }) as unknown as typeof fetch;
+
+    try {
+      const supported: UsageTimelineSessionPhaseResponse[] = [
+        "research",
+        "explore",
+        "proposal",
+        "apply",
+        "verify",
+        "quick-flow",
+        "other",
+        "unassigned",
+      ];
+      const phase = (supported[supported.length - 1] ?? "unassigned") satisfies NonNullable<
+        TimelineApiArg["sessionPhase"]
+      >;
+      const result = await createAppStore()
+        .dispatch(generatedApi.endpoints.timeline.initiate({ sessionPhase: phase }))
+        .unwrap();
+      expect(requestedUrl).toContain("/api/usage/timeline?sessionPhase=unassigned");
+      expect(result.sessionPhase).toBe("unassigned");
     } finally {
       globalThis.fetch = originalFetch;
     }

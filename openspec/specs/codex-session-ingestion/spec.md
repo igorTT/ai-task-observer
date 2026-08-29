@@ -435,23 +435,70 @@ the established distinction between complete, partial, and unavailable API-equiv
 
 ### Requirement: Session page reflects returned cost state
 
-The session page SHALL render the estimated cost and cost completeness state returned by the
-session detail response and SHALL NOT synthesize a permanently partial state when cost data is
-complete.
+The session page SHALL render the estimated cost returned by the session detail response, SHALL
+show an explained warning badge when cost is partial or unavailable, and SHALL NOT show a positive
+cost-complete badge when cost data is complete.
 
 #### Scenario: Complete session estimate is displayed
 
 - **WHEN** session detail returns a non-null estimate with `costComplete: true`
-- **THEN** the page SHALL display the returned estimate, identify the cost as complete, and SHALL
-  NOT label it as partial
+- **THEN** the page SHALL display the returned estimate without a partial, unavailable, or
+  cost-complete badge
 
 #### Scenario: Partial session estimate is displayed
 
 - **WHEN** session detail returns a known estimate with `costComplete: false`
-- **THEN** the page SHALL display the returned known estimate, identify it as partial, and display
-  its pricing-gap indicators
+- **THEN** the page SHALL display the returned known estimate, identify it as partial, display its
+  pricing-gap indicators, and provide an accessible explanation for each warning badge
 
 #### Scenario: Unavailable session estimate is displayed
 
 - **WHEN** session detail returns `estimatedCostUsd: null` with `costComplete: false`
-- **THEN** the page SHALL present cost as unavailable rather than displaying a numeric zero
+- **THEN** the page SHALL present cost as unavailable rather than displaying a numeric zero and
+  SHALL provide an accessible explanation on its unavailable-cost warning badge
+
+### Requirement: Low-frequency missed-notification recovery
+
+The system SHALL periodically reconcile supported session sources beneath every available root so
+that ingestion eventually observes file creation and append activity even when native filesystem
+notifications are absent. Recovery reconciliation SHALL be configurable, SHALL default to no more
+than one sweep per minute, and SHALL preserve native notifications as the prompt update path.
+
+#### Scenario: Append notification is missed
+
+- **WHEN** complete records are appended after a committed checkpoint and no native change
+  notification is delivered
+- **THEN** the next recovery sweep SHALL discover the advanced source and schedule its incremental
+  import without requiring a restart or explicit rescan
+
+#### Scenario: New-file notification is missed
+
+- **WHEN** a supported session file is created beneath an available root and no native creation
+  notification is delivered
+- **THEN** the next recovery sweep SHALL discover and schedule that source for import
+
+#### Scenario: Recovery sweep finds unchanged sources
+
+- **WHEN** a recovery sweep inspects sources whose committed source state has not advanced
+- **THEN** the system SHALL leave session facts and checkpoints unchanged and SHALL NOT duplicate
+  token or developer-turn accounting
+
+#### Scenario: Recovery overlaps other ingestion work
+
+- **WHEN** a recovery sweep discovers a source already queued or being processed by watcher,
+  startup, or explicit-rescan work
+- **THEN** the system SHALL coalesce or serialize the work and SHALL NOT run overlapping imports for
+  that source
+
+#### Scenario: Recovery inspection fails
+
+- **WHEN** a recovery sweep cannot discover a root or inspect a source
+- **THEN** unrelated roots and sources SHALL continue processing and diagnostics SHALL expose only a
+  sanitized source and failure category
+
+#### Scenario: Recovery interval has not elapsed
+
+- **WHEN** an available source changes after one recovery sweep but before the configured interval
+  elapses and no native notification is delivered
+- **THEN** the system MAY defer that change until the next scheduled sweep and SHALL NOT perform
+  continuous high-frequency polling

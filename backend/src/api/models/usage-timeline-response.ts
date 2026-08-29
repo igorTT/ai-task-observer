@@ -1,9 +1,11 @@
 import type { CostGenerationIdentityResponse } from "@/api/models/issue-usage-response.js";
+import type { SessionPhase } from "@/modules/sessions/domain.js";
 
 export type UsageTimelineRangeResponse = "12h" | "24h";
 export type UsageTimelineBucketUnitResponse = "hour";
 export type UsageTimelineCoverageResponse = "current" | "stale" | "missing";
 export type UsageTimelineCompletenessState = "complete" | "partial" | "unavailable";
+export type UsageTimelineSessionPhaseResponse = SessionPhase | "unassigned";
 
 export interface UsageTimelineCompletenessResponse {
   readonly token: UsageTimelineCompletenessState;
@@ -29,6 +31,7 @@ export interface UsageTimelineResponse {
   readonly bucketUnit: UsageTimelineBucketUnitResponse;
   readonly startAt: string;
   readonly endAt: string;
+  readonly sessionPhase: UsageTimelineSessionPhaseResponse | null;
   readonly totals: UsageTimelineTotalsResponse;
   readonly buckets: readonly UsageTimelineBucketResponse[];
   readonly unknownTimeObservationCount: string;

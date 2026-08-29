@@ -6,6 +6,7 @@ const injectedRtkApi = api.injectEndpoints({
         url: `/api/usage/timeline`,
         params: {
           range: queryArg.range,
+          sessionPhase: queryArg.sessionPhase,
         },
       }),
     }),
@@ -78,6 +79,7 @@ export { injectedRtkApi as generatedApi };
 export type TimelineApiResponse = /** status 200 Usage timeline */ UsageTimelineResponse;
 export type TimelineApiArg = {
   range?: string;
+  sessionPhase?: UsageTimelineSessionPhaseResponse;
 };
 export type GetHealthApiResponse = /** status 200 Healthy */ HealthResponse;
 export type GetHealthApiArg = void;
@@ -126,6 +128,9 @@ export type RecalculateCostsApiResponse = /** status 202 Accepted */ Recalculate
 export type RecalculateCostsApiArg = void;
 export type UsageTimelineRangeResponse = "12h" | "24h";
 export type UsageTimelineBucketUnitResponse = "hour";
+export type SessionPhase =
+  "research" | "explore" | "proposal" | "apply" | "verify" | "quick-flow" | "other";
+export type UsageTimelineSessionPhaseResponse = SessionPhase | "unassigned";
 export type UsageTimelineCompletenessState = "complete" | "partial" | "unavailable";
 export type UsageTimelineCompletenessResponse = {
   token: UsageTimelineCompletenessState;
@@ -163,6 +168,7 @@ export type UsageTimelineResponse = {
   bucketUnit: UsageTimelineBucketUnitResponse;
   startAt: string;
   endAt: string;
+  sessionPhase: UsageTimelineSessionPhaseResponse | null;
   totals: UsageTimelineTotalsResponse;
   buckets: UsageTimelineBucketResponse[];
   unknownTimeObservationCount: string;
@@ -187,8 +193,6 @@ export type TokenCompletenessResponse = {
 };
 export type AttributionStatus =
   "unlinked" | "unconfigured" | "pending" | "linked" | "not_found" | "error";
-export type SessionPhase =
-  "research" | "explore" | "proposal" | "apply" | "verify" | "quick-flow" | "other";
 export type LinearIssueResponse = {
   id: string;
   identifier: string;
