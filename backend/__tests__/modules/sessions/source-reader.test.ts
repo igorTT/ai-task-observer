@@ -61,7 +61,6 @@ describe("Codex source discovery and bounded reading", () => {
       sourceIdentity: source.key,
       committedOffset: 2n,
       observedSize: 2n,
-      observedModifiedAtMs: source.modifiedAtMs,
       parserVersion: 1,
       status: "ready" as const,
       unknownRecords: 0,

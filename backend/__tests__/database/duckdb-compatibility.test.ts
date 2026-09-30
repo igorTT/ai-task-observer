@@ -17,7 +17,7 @@ test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it",
   try {
     const database = await AppDatabase.open(path);
     await applyMigrations(database, pino({ enabled: false }));
-    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(2);
+    expect(await new MigrationRepository(database.connection).findAll()).toHaveLength(3);
     const ingestion = new CodexIngestionRepository(database);
     await ingestion.runs.create("compatibility-run", "startup");
     await ingestion.runs.setState("compatibility-run", "running");
@@ -46,7 +46,6 @@ test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it",
       sourceIdentity: "1:1",
       committedOffset: 10n,
       observedSize: 10n,
-      observedModifiedAtMs: 1n,
       parserVersion: 3,
       runId: "compatibility-run",
       rebuild: true,
@@ -60,7 +59,7 @@ test("Bun loads DuckDB, migrates a file, queries it, closes it, and reopens it",
     database.close();
 
     const reopened = await AppDatabase.open(path);
-    expect(await new MigrationRepository(reopened.connection).findAll()).toHaveLength(2);
+    expect(await new MigrationRepository(reopened.connection).findAll()).toHaveLength(3);
     const reopenedIngestion = new CodexIngestionRepository(reopened);
     expect(await reopenedIngestion.sessions.findById("compatibility-session")).toMatchObject({
       developerTurns: 1n,

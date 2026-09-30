@@ -34,7 +34,12 @@ export async function inspectSource(
 }
 
 export function sourceCompatibility(
-  checkpoint: ImportCheckpoint | undefined,
+  checkpoint:
+    | Pick<
+        ImportCheckpoint,
+        "sourceIdentity" | "committedOffset" | "observedSize" | "parserVersion"
+      >
+    | undefined,
   source: SourceIdentity & { readonly key: string },
   parserVersion: number,
 ): SourceCompatibility {

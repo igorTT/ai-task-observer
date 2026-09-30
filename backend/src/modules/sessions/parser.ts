@@ -327,15 +327,11 @@ export function parseCodexRecords(lines: readonly string[], context: ParserConte
   const mutations: SessionMutation[] = metadata ? [{ metadata }] : [];
   const parseState = sessionId
     ? {
-        sourcePath: context.sourcePath,
         sessionId,
-        sourceIdentity,
-        parserVersion,
         activeModel,
         epoch,
         baseline,
         nextRecordNumber,
-        factRevision: (context.parseState?.factRevision ?? 0n) + 1n,
       }
     : undefined;
   return {

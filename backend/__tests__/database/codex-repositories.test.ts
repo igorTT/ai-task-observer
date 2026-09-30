@@ -109,7 +109,7 @@ describe("Codex ingestion repositories", () => {
     opened.database.close();
   });
 
-  test("atomically rolls back selected facts, parse state, summary, and checkpoint", async () => {
+  test("atomically rolls back selected facts, continuation, summary, and checkpoint", async () => {
     const opened = await repository();
     const chunk = sourceChunk("rolled-back", "/root/failing.jsonl", [], []);
     const invalid: SourceChunkMutation = {
@@ -120,8 +120,55 @@ describe("Codex ingestion repositories", () => {
       "missing a session identity",
     );
     expect(await opened.repository.sessions.findById("rolled-back")).toBeUndefined();
-    expect(await opened.repository.parseStates.find("/root/failing.jsonl")).toBeUndefined();
     expect(await opened.repository.checkpoints.find("/root/failing.jsonl")).toBeUndefined();
+    opened.database.close();
+  });
+
+  test("round-trips checkpoint continuation for normal, null-baseline, and stale states", async () => {
+    const opened = await repository();
+    const normalPath = "/root/normal.jsonl";
+    await opened.repository.applySourceChunk(
+      sourceChunk("normal", normalPath, [], [], {
+        sessionId: "normal",
+        activeModel: "model-a",
+        epoch: 2,
+        baseline: { input: 120n, cachedInput: null, output: 30n },
+        nextRecordNumber: 19n,
+      }),
+    );
+    expect(await opened.repository.checkpoints.find(normalPath)).toMatchObject({
+      sessionId: "normal",
+      activeModel: "model-a",
+      epoch: 2,
+      baseline: { input: 120n, cachedInput: null, output: 30n },
+      nextRecordNumber: 19n,
+    });
+
+    const nullPath = "/root/null-baseline.jsonl";
+    await opened.repository.applySourceChunk(
+      sourceChunk("null-baseline", nullPath, [], [], {
+        sessionId: "null-baseline",
+        activeModel: "unknown",
+        epoch: 0,
+        baseline: { input: null, cachedInput: null, output: null },
+        nextRecordNumber: 1n,
+      }),
+    );
+    expect(await opened.repository.checkpoints.find(nullPath)).toMatchObject({
+      sessionId: "null-baseline",
+      baseline: null,
+    });
+
+    await opened.repository.markRebuildFailed(normalPath, "source_failure:invalid_json");
+    expect(await opened.repository.checkpoints.find(normalPath)).toMatchObject({
+      status: "stale",
+      lastError: "source_failure:invalid_json",
+      sessionId: "normal",
+      activeModel: "model-a",
+      epoch: 2,
+      baseline: { input: 120n, cachedInput: null, output: 30n },
+      nextRecordNumber: 19n,
+    });
     opened.database.close();
   });
 
@@ -206,6 +253,7 @@ function sourceChunk(
   sourcePath: string,
   events: readonly SelectedSessionEvent[],
   observations: readonly UsageObservation[],
+  continuation = parseState(sessionId),
 ): SourceChunkMutation {
   return {
     sourcePath,
@@ -213,28 +261,23 @@ function sourceChunk(
     sourceIdentity: `identity:${sourcePath}`,
     committedOffset: 99n,
     observedSize: 100n,
-    observedModifiedAtMs: 10n,
     parserVersion: 3,
     mutations: [{ metadata: { sessionId, sourceRoot: "/root", sourcePath } }],
     events,
     observations,
-    parseState: parseState(sessionId, sourcePath),
+    parseState: continuation,
     diagnostics: { unknownRecords: 0, malformedRecords: 0, warnings: [] },
     rebuild: true,
   };
 }
 
-function parseState(sessionId: string, sourcePath: string): SourceParseState {
+function parseState(sessionId: string): SourceParseState {
   return {
-    sourcePath,
     sessionId,
-    sourceIdentity: `identity:${sourcePath}`,
-    parserVersion: 3,
     activeModel: "unknown",
     epoch: 0,
     baseline: null,
     nextRecordNumber: 4n,
-    factRevision: 1n,
   };
 }
 

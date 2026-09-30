@@ -150,13 +150,11 @@ export class CodexSourceImporter {
     runId?: string,
   ): Promise<ImportSourceResult> {
     let offset = checkpoint.committedOffset;
-    const existing = await this.#repository.sessions.findBySourcePath(sourcePath);
-    let sessionId = existing?.sessionId;
+    let sessionId = checkpoint.sessionId;
     const sessions = new Set<string>();
     let unknownRecords = checkpoint.unknownRecords;
     let malformedRecords = checkpoint.malformedRecords;
-    let parseState = await this.#repository.parseStates.find(sourcePath);
-    if (!parseState) throw new Error("Committed checkpoint is missing parser state");
+    let parseState: SourceParseState = checkpoint;
 
     while (offset < source.size) {
       const range = await readCompleteRecords(sourcePath, offset, this.#readChunkBytes);
@@ -256,7 +254,6 @@ function sourceChunk(input: {
     sourceIdentity: input.source.key,
     committedOffset: input.offset,
     observedSize: input.source.size,
-    observedModifiedAtMs: input.source.modifiedAtMs,
     parserVersion: input.parserVersion,
     mutations: input.mutations,
     events: input.events,

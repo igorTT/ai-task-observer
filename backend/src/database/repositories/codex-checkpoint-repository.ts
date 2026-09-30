@@ -25,16 +25,27 @@ export class CodexCheckpointRepository {
     const statement = await this.connection.prepare(`
       INSERT INTO codex_import_checkpoints (
         source_path, source_root, source_identity, committed_offset, observed_size,
-        observed_modified_at_ms, parser_version, status, unknown_records,
-        malformed_records, last_error
-      ) VALUES ($path, $root, $identity, $offset, $size, $mtime, $version, $status, $unknown, $malformed, $error)
+        parser_version, session_id, active_model, normalization_epoch,
+        baseline_input, baseline_cached_input, baseline_output, next_record_number,
+        status, unknown_records, malformed_records, last_error
+      ) VALUES (
+        $path, $root, $identity, $offset, $size, $version, $sessionId, $activeModel,
+        $epoch, $baselineInput, $baselineCachedInput, $baselineOutput, $nextRecordNumber,
+        $status, $unknown, $malformed, $error
+      )
       ON CONFLICT (source_path) DO UPDATE SET
         source_root = excluded.source_root,
         source_identity = excluded.source_identity,
         committed_offset = excluded.committed_offset,
         observed_size = excluded.observed_size,
-        observed_modified_at_ms = excluded.observed_modified_at_ms,
         parser_version = excluded.parser_version,
+        session_id = excluded.session_id,
+        active_model = excluded.active_model,
+        normalization_epoch = excluded.normalization_epoch,
+        baseline_input = excluded.baseline_input,
+        baseline_cached_input = excluded.baseline_cached_input,
+        baseline_output = excluded.baseline_output,
+        next_record_number = excluded.next_record_number,
         status = excluded.status,
         unknown_records = excluded.unknown_records,
         malformed_records = excluded.malformed_records,
@@ -47,8 +58,14 @@ export class CodexCheckpointRepository {
       identity: checkpoint.sourceIdentity,
       offset: checkpoint.committedOffset,
       size: checkpoint.observedSize,
-      mtime: checkpoint.observedModifiedAtMs,
       version: checkpoint.parserVersion,
+      sessionId: checkpoint.sessionId,
+      activeModel: checkpoint.activeModel,
+      epoch: checkpoint.epoch,
+      baselineInput: checkpoint.baseline?.input ?? null,
+      baselineCachedInput: checkpoint.baseline?.cachedInput ?? null,
+      baselineOutput: checkpoint.baseline?.output ?? null,
+      nextRecordNumber: checkpoint.nextRecordNumber,
       status: checkpoint.status,
       unknown: checkpoint.unknownRecords,
       malformed: checkpoint.malformedRecords,

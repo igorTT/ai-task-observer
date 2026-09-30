@@ -6,7 +6,6 @@ import { CodexImportRunRepository } from "@/database/repositories/codex-import-r
 import { CodexSessionEventRepository } from "@/database/repositories/codex-session-event-repository.js";
 import { CodexSessionRepository } from "@/database/repositories/codex-session-repository.js";
 import { CodexSessionUsageRepository } from "@/database/repositories/codex-session-usage-repository.js";
-import { CodexSourceParseStateRepository } from "@/database/repositories/codex-source-parse-state-repository.js";
 import { CodexUsageObservationRepository } from "@/database/repositories/codex-usage-observation-repository.js";
 import { LinearSessionAttributionRepository } from "@/database/repositories/linear-session-attribution-repository.js";
 import type { SessionAttribution } from "@/modules/linear/domain.js";
@@ -17,7 +16,6 @@ export class CodexIngestionRepository {
   public readonly usage: CodexSessionUsageRepository;
   public readonly events: CodexSessionEventRepository;
   public readonly observations: CodexUsageObservationRepository;
-  public readonly parseStates: CodexSourceParseStateRepository;
   public readonly checkpoints: CodexCheckpointRepository;
   public readonly runs: CodexImportRunRepository;
 
@@ -29,7 +27,6 @@ export class CodexIngestionRepository {
     this.usage = new CodexSessionUsageRepository(this.connection);
     this.events = new CodexSessionEventRepository(this.connection);
     this.observations = new CodexUsageObservationRepository(this.connection);
-    this.parseStates = new CodexSourceParseStateRepository(this.connection);
     this.checkpoints = new CodexCheckpointRepository(this.connection);
     this.runs = new CodexImportRunRepository(this.connection);
   }
@@ -63,7 +60,6 @@ export class CodexIngestionRepository {
       if (chunk.rebuild) {
         await this.events.deleteBySourcePath(chunk.sourcePath);
         await this.observations.deleteBySourcePath(chunk.sourcePath);
-        await this.parseStates.delete(chunk.sourcePath);
       }
 
       if (pathOwner && pathOwner.sessionId !== chunk.parseState.sessionId) {
@@ -92,7 +88,6 @@ export class CodexIngestionRepository {
       }
       for (const event of chunk.events) await this.events.insert(event);
       for (const observation of chunk.observations) await this.observations.insert(observation);
-      await this.parseStates.upsert(chunk.parseState);
 
       for (const sessionId of touched) {
         const session = await this.sessions.findById(sessionId);
@@ -119,8 +114,12 @@ export class CodexIngestionRepository {
         sourceIdentity: chunk.sourceIdentity,
         committedOffset: chunk.committedOffset,
         observedSize: chunk.observedSize,
-        observedModifiedAtMs: chunk.observedModifiedAtMs,
         parserVersion: chunk.parserVersion,
+        sessionId: chunk.parseState.sessionId,
+        activeModel: chunk.parseState.activeModel,
+        epoch: chunk.parseState.epoch,
+        baseline: chunk.parseState.baseline,
+        nextRecordNumber: chunk.parseState.nextRecordNumber,
         status: "ready",
         unknownRecords: chunk.diagnostics.unknownRecords,
         malformedRecords: chunk.diagnostics.malformedRecords,
@@ -229,7 +228,6 @@ export class CodexIngestionRepository {
     }
     await this.events.deleteBySourcePath(existing.sourcePath);
     await this.observations.deleteBySourcePath(existing.sourcePath);
-    await this.parseStates.delete(existing.sourcePath);
     await this.checkpoints.delete(existing.sourcePath);
   }
 }

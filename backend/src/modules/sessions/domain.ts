@@ -85,15 +85,11 @@ export interface UsageObservation {
 }
 
 export interface SourceParseState {
-  readonly sourcePath: string;
   readonly sessionId: string;
-  readonly sourceIdentity: string;
-  readonly parserVersion: number;
   readonly activeModel: string;
   readonly epoch: number;
   readonly baseline: RawTokenCounters | null;
   readonly nextRecordNumber: bigint;
-  readonly factRevision: bigint;
 }
 
 export interface SessionMetadataMutation {
@@ -140,8 +136,12 @@ export interface ImportCheckpoint {
   readonly sourceIdentity: string;
   readonly committedOffset: bigint;
   readonly observedSize: bigint;
-  readonly observedModifiedAtMs: bigint;
   readonly parserVersion: number;
+  readonly sessionId: string;
+  readonly activeModel: string;
+  readonly epoch: number;
+  readonly baseline: RawTokenCounters | null;
+  readonly nextRecordNumber: bigint;
   readonly status: ImportState;
   readonly unknownRecords: number;
   readonly malformedRecords: number;
@@ -170,7 +170,6 @@ export interface SourceChunkMutation {
   readonly sourceIdentity: string;
   readonly committedOffset: bigint;
   readonly observedSize: bigint;
-  readonly observedModifiedAtMs: bigint;
   readonly parserVersion: number;
   readonly mutations: readonly SessionMutation[];
   readonly events: readonly SelectedSessionEvent[];
