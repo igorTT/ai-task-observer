@@ -1,0 +1,105 @@
+backend/src/database/models/codex-import-checkpoint.model.ts
+  s_67d2eff4acc89a::t_6901e0b3055ecf 4,13-19,28-38,46-50
+backend/src/modules/sessions/source-reader.ts
+  s_67d2eff4acc89a::t_a2f00b12c3b413 37-42
+openspec/changes/archive/2026-09-30-consolidate-codex-import-checkpoints/design.md
+  s_d9174790b313cc::t_0abefd70f1d347 1-123
+openspec/specs/usage-dashboard/spec.md
+  s_3f94413d679466::t_d4c0dcbf12b941 519-567
+openspec/specs/usage-timeline-aggregation/spec.md
+  s_3f94413d679466::t_5e0ce9da96e071 141-221
+backend/__tests__/database/codex-repositories.test.ts
+  s_67d2eff4acc89a::t_56d04ca412b1a8 112,127-174,256,268,274
+backend/__tests__/database/duckdb-compatibility.test.ts
+  s_67d2eff4acc89a::t_f87b6a2271a3ce 20,62
+backend/__tests__/database/migrate.test.ts
+  s_67d2eff4acc89a::t_7e9015df39b32c 37-43,53,58,61,84-95,106,110-254,275,378,413
+backend/__tests__/modules/sessions/importer.test.ts
+  s_67d2eff4acc89a::t_99dc1eb29fee39 19-20,22,25-29,35-37,130-131,159-160,162-165,167-171,182-385,402-404,409-410,412-413,418-552,603-615,633-653,786-894
+backend/src/database/migrations/003_consolidate-codex-import-checkpoints.sql
+  s_67d2eff4acc89a::t_75ef1c1240dc59 1-97
+backend/src/database/repositories/codex-checkpoint-repository.ts
+  s_67d2eff4acc89a::t_47d6495e031b0d 28-35,42-48,62-68
+backend/src/database/repositories/codex-ingestion-repository.ts
+  s_67d2eff4acc89a::t_04cf77c103cfdd 118-122
+backend/src/modules/sessions/domain.ts
+  s_67d2eff4acc89a::t_70293ba22d0b79 140-144
+backend/src/modules/sessions/importer.ts
+  s_67d2eff4acc89a::t_4afeb3465191ff 153,157
+docs/CARTODEX_MAP.md
+  s_67d2eff4acc89a::t_62910a275bab6a 2-4,9,13-18,24-25,40-44,68-70,117-120,123-124,143,145-146,157-163,201,212-215,227-230,232,250-256,259-260,278,290-316,328-335,358-361,379-380,416-418,423-426,443-444,470-472
+docs/audit/README.md
+  s_929cf273da2e51::t_60417949eda280 1-59
+docs/audit/data-models/TEMPLATE.md
+  s_929cf273da2e51::t_38e2683dc61add 1-48
+docs/audit/data-models/codex-import-checkpoint.md
+  s_929cf273da2e51::t_6f671db61e0e74 1-87
+docs/audit/data-models/codex-import-run.md
+  s_929cf273da2e51::t_80bef63f3b393b 1-42
+docs/audit/data-models/codex-session-event.md
+  s_929cf273da2e51::t_23496a8cb8a232 1-59
+docs/audit/data-models/codex-session-usage.md
+  s_929cf273da2e51::t_f551da97207993 1-44
+docs/audit/data-models/codex-session.md
+  s_929cf273da2e51::t_ceb18682b5d81f 1-58
+docs/audit/data-models/codex-source-parse-state.md
+  s_929cf273da2e51::t_6c05154bd1e9ce 1-57
+docs/audit/data-models/codex-usage-observation.md
+  s_929cf273da2e51::t_320d78bae9b2f5 1-102
+docs/audit/ingestion-flow.md
+  s_67d2eff4acc89a::t_c433f2da76e26d 1-74
+openspec/changes/archive/2026-09-30-consolidate-codex-import-checkpoints/.openspec.yaml
+  s_d97072e421ae3d::t_a187bcc085d3a6 1-3
+openspec/changes/archive/2026-09-30-consolidate-codex-import-checkpoints/proposal.md
+  s_d97072e421ae3d::t_5cd3c2ba38b725 1-50
+openspec/changes/archive/2026-09-30-consolidate-codex-import-checkpoints/tasks.md
+  s_67d2eff4acc89a::t_be066160fa7270 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c692782834af48c78de7ea178d1de64d0245e2aa",
+  "prompts": {},
+  "sessions": {
+    "s_3f94413d679466": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3de-a548-7261-8b78-16500008d8d4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Igor <hirzhek@gmail.com>"
+    },
+    "s_67d2eff4acc89a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3c2-91c1-7b13-a9f1-17d81ba68496",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Igor <hirzhek@gmail.com>"
+    },
+    "s_929cf273da2e51": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04cf8-ce34-7500-9f5d-988eb697e423",
+        "model": "unknown"
+      },
+      "human_author": "Igor <hirzhek@gmail.com>"
+    },
+    "s_d9174790b313cc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3ab-3157-7de0-bfbe-0fd538bdbf94",
+        "model": "gpt-6-luna"
+      },
+      "human_author": "Igor <hirzhek@gmail.com>"
+    },
+    "s_d97072e421ae3d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f3ad-c437-7d43-8a6d-92da520efa73",
+        "model": "unknown"
+      },
+      "human_author": "Igor <hirzhek@gmail.com>"
+    }
+  }
+}
